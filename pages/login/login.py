@@ -2,10 +2,21 @@ import customtkinter
 from tkinter import messagebox
 from tkinter import *
 import bcrypt
-from db_creation import user
+import signup
+from db_creation import db, user
+from flask import Flask
 
 customtkinter.set_appearance_mode("dark")
 customtkinter.set_default_color_theme("dark-blue")
+
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///C:/Users/balin/Desktop/SQLite_DB/net-management.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db.init_app(app)
+
+def switch_to_signup():
+    signup.signup_page()
 
 def login_page():
     root = customtkinter.CTk()
@@ -43,6 +54,13 @@ def login_page():
     checkbox = customtkinter.CTkCheckBox(master = frame, text = "Remember me")
     checkbox.pack(pady = 12, padx = 10)
 
+    signup_button = customtkinter.CTkButton(master = frame, text = "Sign up", cursor = 'hand2', command = switch_to_signup)
+    signup_button.pack(pady = 1, padx = 10)
+
     print("Login Seccessfully done")
 
     root.mainloop()
+
+if __name__ == '__main__':
+    with app.app_context():
+        login_page()

@@ -9,12 +9,6 @@ import login
 customtkinter.set_appearance_mode("dark")
 customtkinter.set_default_color_theme("dark-blue")
 
-app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///C:/Users/balin/Desktop/SQLite_DB/net-management.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-db.init_app(app)
-
 def switch_to_login():
     login.login_page()
 
@@ -79,7 +73,3 @@ def signup_page():
     login_button.pack(pady = 1, padx = 10)
 
     root.mainloop()
-
-if __name__ == '__main__':
-    with app.app_context():
-        signup_page()
