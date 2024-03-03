@@ -5,6 +5,7 @@ import bcrypt
 import signup
 from db_creation import db, user
 from flask import Flask
+import router_data
 
 customtkinter.set_appearance_mode("dark")
 customtkinter.set_default_color_theme("dark-blue")
@@ -18,9 +19,19 @@ db.init_app(app)
 def switch_to_signup():
     signup.signup_page()
 
+def switch_to_main():
+    router_data.main_page()
+
 def login_page():
     root = customtkinter.CTk()
-    root.geometry("500x350")
+    
+    # Get the screen width and height
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+
+    # Set the window size to the screen resolution
+    root.geometry(f"{screen_width}x{screen_height}")
+    # root.geometry("1000x1000")
 
     def login():
         username = username_entry.get()
@@ -29,7 +40,7 @@ def login_page():
         if user_data:
             stored_password = user_data.password
             if bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
-                messagebox.showinfo("Login Successful", "Welcome back, " + username + "!")
+                switch_to_main()
             else:
                 messagebox.showerror("Login Failed", "Incorrect password.")
         else:
