@@ -19,8 +19,8 @@ db.init_app(app)
 def switch_to_signup():
     signup.signup_page()
 
-def switch_to_main():
-    router_data.main_page()
+def switch_to_router_data():
+    router_data.router_data_page()
 
 def login_page():
     root = customtkinter.CTk()
@@ -40,7 +40,7 @@ def login_page():
         if user_data:
             stored_password = user_data.password
             if bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
-                switch_to_main()
+                switch_to_router_data()
             else:
                 messagebox.showerror("Login Failed", "Incorrect password.")
         else:
