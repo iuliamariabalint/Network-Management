@@ -2,7 +2,7 @@ import customtkinter
 from tkinter import *
 import bcrypt
 import json
-import active_clients
+import main
 
 customtkinter.set_appearance_mode("dark")
 customtkinter.set_default_color_theme("dark-blue")
@@ -13,7 +13,7 @@ screen_height = root.winfo_screenheight()
 root.geometry(f"{screen_width}x{screen_height}")
 
 def switch_to_main():
-    active_clients.main_page()
+    main.main_page()
 
 def router_data_page():
     
