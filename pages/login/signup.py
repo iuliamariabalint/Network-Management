@@ -53,7 +53,7 @@ def signup_page():
     username_entry = customtkinter.CTkEntry(master = frame, placeholder_text = "Username")
     username_entry.pack(pady = 12, padx = 10)
 
-    password_entry = customtkinter.CTkEntry(master = frame, placeholder_text = "Password")
+    password_entry = customtkinter.CTkEntry(master = frame, placeholder_text = "Password", show="*")
     password_entry.pack(pady = 12, padx = 10)
 
     button = customtkinter.CTkButton(master = frame, text = "Sign up", command = lambda: signup(username_entry, password_entry, account_type_var))

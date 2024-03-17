@@ -47,7 +47,7 @@ def router_data_page():
     user_entry = customtkinter.CTkEntry(master = frame, placeholder_text = "router admin user")
     user_entry.pack(pady = 12, padx = 10)
 
-    password_entry = customtkinter.CTkEntry(master = frame, placeholder_text = "router password")
+    password_entry = customtkinter.CTkEntry(master = frame, placeholder_text = "router password", show="*")
     password_entry.pack(pady = 12, padx = 10)
 
     button = customtkinter.CTkButton(master = frame, text = "Save", command = save_router_data)
