@@ -23,7 +23,7 @@ class App(ctk.CTk):
         self.geometry("720x550")
         self.resizable(True, True)
         #self.iconphoto(False, tk.PhotoImage(file="assets/title_icon.png"))
-
+    
         ## Creating a container
         container = ctk.CTkFrame(self)
         container.pack(side="top", fill="both", expand = True)
@@ -47,8 +47,8 @@ class App(ctk.CTk):
 
     def show_frame(self, cont):
         frame = self.frames[cont]
-        #menubar = frame.create_menubar(self)
-        #self.configure(menu=menubar)
+        menubar = frame.create_menubar(self)
+        self.configure(menu=menubar)
         frame.tkraise()                         ## This line will put the frame on front
  
 #---------------------------------------- LOGINPAGE / CONTAINER ------------------------------------------------------------------------
@@ -87,6 +87,10 @@ class LoginPage(ctk.CTkFrame):
                     messagebox.showerror("Login Failed", "Incorrect password.")
             else:
                 messagebox.showerror("Login Failed", "Username not found.")
+
+    def create_menubar(self, parent):
+        menubar = Menu(parent, bd=3, relief=RAISED)
+        return menubar
         
 #---------------------------------------- SIGNUP-PAGE / CONTAINER ------------------------------------------------------------------------
 
@@ -142,6 +146,10 @@ class SignupPage(ctk.CTkFrame):
             salt = bcrypt.gensalt()
             hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
             return hashed_password.decode('utf-8')
+    
+    def create_menubar(self, parent):
+        menubar = Menu(parent, bd=3, relief=RAISED)
+        return menubar
 
 #---------------------------------------- ROUTER-DATA-PAGE / CONTAINER ------------------------------------------------------------------------
 import json
@@ -171,11 +179,27 @@ class RouterDataPage(ctk.CTkFrame):
             "router_password": password.get(),
             "ip_address": "192.168.99.1"
             }
-        
-            with open("router_data.json", "w") as file:
-                json.dump(data, file)
+            try:
+                host = data['ip_address']
+                username = data['router_user']
+                password = data['router_password']
+                client = paramiko.SSHClient()
+                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                client.connect(hostname=host, username=username, password=password, timeout=5) 
+                with open("router_data.json", "w") as file:
+                    json.dump(data, file)
+                parent.show_frame(parent.HomePage)
+                return True 
+            except paramiko.AuthenticationException:
+                messagebox.showerror("Error","Wrong credentials")
+                return False
+            finally:
+                client.close()
+            
 
-            parent.show_frame(parent.HomePage)
+    def create_menubar(self, parent):
+        menubar = Menu(parent, bd=3, relief=RAISED)
+        return menubar
 
 #---------------------------------------- HOME PAGE FRAME / CONTAINER ------------------------------------------------------------------------
 import paramiko
@@ -184,56 +208,66 @@ class HomePage(ctk.CTkFrame):
     def __init__(self, parent, container):
         super().__init__(container)
 
-        data = open('router_data.json')
-        router_data = json.load(data)
+        try:
+            with open('router_data.json') as data_file:
+                router_data = json.load(data_file)
 
-        command = "cat /tmp/dhcp.leases"
+            command = "cat /tmp/dhcp.leases"
 
-        host = router_data['ip_address']
-        username = router_data['router_user']
-        password = router_data['router_password']
+            host = router_data['ip_address']
+            username = router_data['router_user']
+            password = router_data['router_password']
+            client = paramiko.SSHClient()
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            client.connect(hostname=host, username=username, password=password)
 
-        client = paramiko.client.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        client.connect(host, username=username, password=password)
-        stdin, stdout, stderr = client.exec_command(command)
-        active_clients = stdout.read().decode()
-        client.close()
+            stdin, stdout, stderr = client.exec_command(command)
+            active_clients = stdout.read().decode()
+            client.close()
+            dhcp_leases = []
+            for line in active_clients.split('\n'):
+                if line.strip():
+                    timestamp, mac_address, ip_address, hostname, client_id = line.split()
+                    dhcp_lease = {
+                        "timestamp": timestamp,
+                        "mac_address": mac_address,
+                        "ip_address": ip_address,
+                        "hostname": hostname,
+                        "client_id": client_id
+                    }
+                    dhcp_leases.append(dhcp_lease)
 
-        dhcp_leases = []
-        for line in active_clients.split('\n'):
-            if line.strip():
-                timestamp, mac_address, ip_address, hostname, client_id = line.split()
-                dhcp_lease = {
-                    "timestamp": timestamp,
-                    "mac_address": mac_address,
-                    "ip_address": ip_address,
-                    "hostname": hostname,
-                    "client_id": client_id
-                }
-                dhcp_leases.append(dhcp_lease)
+            with open("active_clients.json", "w") as file:
+                json.dump(dhcp_leases, file, indent = 4)
 
-        with open("active_clients.json", "w") as file:
-            json.dump(dhcp_leases, file, indent = 4)
+            self.columnconfigure(0, weight=1)
+            self.columnconfigure(1, weight=1)
+
+            label = ctk.CTkLabel(self, text="Home Page")
+            label.grid(row = 0, column = 0, sticky = E, pady = 20, padx = 10)
+
+            for i, lease in enumerate(dhcp_leases):
+                client_info = f"MAC Address: {lease['mac_address']}\nIP Address: {lease['ip_address']}\nHostname: {lease['hostname']}\nClient ID: {lease['client_id']}"
+                label = ctk.CTkLabel(self, text=client_info)
+                label.grid(row=i+1, column=0, sticky = E, pady=30, padx=10)
+                button = ctk.CTkButton(self, text="Manage device")
+                button.grid(row=i+1, column=1, sticky = W, pady=45, padx=10)
+                # with open("active_clients.json", "w") as file:
+                #     json.dump(dhcp_leases, file, indent = 4)
+
+            dhcp_leases.clear()
+        except FileNotFoundError:
+            print("Fișierul JSON nu a fost găsit.")
+            
         
-        self.columnconfigure(0, weight=1)
-        self.columnconfigure(1, weight=1)
-        label = ctk.CTkLabel(self, text="Home Page")
-        label.grid(row = 0, column = 0, sticky = E, pady = 20, padx = 10)
-        for i, lease in enumerate(dhcp_leases):
-            client_info = f"MAC Address: {lease['mac_address']}\nIP Address: {lease['ip_address']}\nHostname: {lease['hostname']}\nClient ID: {lease['client_id']}"
-            label = ctk.CTkLabel(self, text=client_info)
-            label.grid(row=i+1, column=0, sticky = E, pady=30, padx=10)
-            button = ctk.CTkButton(self, text="Manage device")
-            button.grid(row=i+1, column=1, sticky = W, pady=45, padx=10)
 
     def create_menubar(self, parent):
         menubar = Menu(parent, bd=3, relief=RAISED)
 
         ## Filemenu
-        filemenu = Menu(menubar, tearoff=0, relief=RAISED, activebackground="#026AA9")
-        menubar.add_cascade(label="File", menu=filemenu)
-        filemenu.add_command(label="New Project", command=lambda: parent.show_frame(parent.Validation))
+        filemenu = Menu(menubar, tearoff=0, relief=RAISED)
+        menubar.add_cascade(label="Devices", menu=filemenu)
+        filemenu.add_command(label="Managed devices", command=lambda: parent.show_frame(parent.Validation))
         filemenu.add_command(label="Close", command=lambda: parent.show_frame(parent.HomePage))
         filemenu.add_separator()
         filemenu.add_command(label="Exit", command=parent.quit)  
