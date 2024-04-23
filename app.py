@@ -46,9 +46,10 @@ class App(ctk.CTk):
         self.RouterDataPage = RouterDataPage
         self.HomePage = HomePage
         self.ManagedDevices = ManagedDevices
+        self.ApplySettings = ApplySettings
 
         ## Defining Frames and Packing it
-        for F in {LoginPage, SignupPage, RouterDataPage, HomePage, ManagedDevices}:
+        for F in {LoginPage, SignupPage, RouterDataPage, HomePage, ManagedDevices, ApplySettings}:
             frame = F(self, container)
             self.frames[F] = frame
             frame.grid(row=0, column=0, sticky = "nsew")    
@@ -225,9 +226,14 @@ import paramiko
 class HomePage(ctk.CTkFrame):
     def __init__(self, parent, container):
         super().__init__(container)
-        self.create_widgets()
+        self.active_clients(parent)
+        self.columnconfigure(0, weight=1)
+        self.columnconfigure(1, weight=1)
 
-    def create_widgets(self):
+        label = ctk.CTkLabel(self, text="Home Page")
+        label.grid(row = 0, column = 0, sticky = E, pady = 20, padx = 10)
+
+    def active_clients(self, parent):
             try:
                 with open('router_data.json') as data_file:
                     router_data = json.load(data_file)
@@ -256,29 +262,19 @@ class HomePage(ctk.CTkFrame):
                             "client_id": client_id
                         }
                         dhcp_leases.append(dhcp_lease)
-
                 with open("active_clients.json", "w") as file:
                     json.dump(dhcp_leases, file, indent = 4)
-
-                self.columnconfigure(0, weight=1)
-                self.columnconfigure(1, weight=1)
-
-                label = ctk.CTkLabel(self, text="Home Page")
-                label.grid(row = 0, column = 0, sticky = E, pady = 20, padx = 10)
-
                 for i, lease in enumerate(dhcp_leases):
                     client_info = f"MAC Address: {lease['mac_address']}\nIP Address: {lease['ip_address']}\nHostname: {lease['hostname']}\nClient ID: {lease['client_id']}"
                     label = ctk.CTkLabel(self, text=client_info)
                     label.grid(row=i+1, column=0, sticky = E, pady=30, padx=10)
-                    button = ctk.CTkButton(self, text="Manage device")
+                    button = ctk.CTkButton(self, text="Manage device", command = lambda: parent.show_frame(parent.ApplySettings))
                     button.grid(row=i+1, column=1, sticky = W, pady=45, padx=10)
                     # with open("active_clients.json", "w") as file:
                     #     json.dump(dhcp_leases, file, indent = 4) 
-                #print('lol')
             except FileNotFoundError:
                 print("Fișierul JSON nu a fost găsit.")
-            
-            self.after(1000, self.create_widgets)
+            self.after(1000, self.active_clients, parent)
 
     def create_menubar(self, parent):
         menubar = Menu(parent, bd=3, relief=RAISED)
@@ -298,12 +294,37 @@ class HomePage(ctk.CTkFrame):
 
         return menubar
 
-import paramiko
-
+#-----------------------------------------------------MANAGED DEVICES FRAME / CONTAINER --------------------------------------------------
 class ManagedDevices(ctk.CTkFrame):
     def __init__(self, parent, container):
         super().__init__(container)
         label = ctk.CTkLabel(self, text="Managed Devices")
+        label.grid(row = 0, column = 0, sticky = E, pady = 20, padx = 10)
+
+
+    def create_menubar(self, parent):
+        menubar = Menu(parent, bd=3, relief=RAISED)
+
+        ## Filemenu
+        filemenu = Menu(menubar, tearoff=0, relief=RAISED)
+        menubar.add_cascade(label="Devices", menu=filemenu)
+        filemenu.add_command(label="Connected devices", command=lambda: parent.show_frame(parent.HomePage))
+        filemenu.add_separator()
+        filemenu.add_command(label="Exit", command=parent.quit)  
+
+        ## help menu
+        help_menu = Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Help", menu=help_menu)
+        help_menu.add_command(label="About")
+        help_menu.add_separator()
+
+        return menubar
+
+#---------------------------------------------------APPLY SETTINGS FRAME / CONTAINER --------------------------------------------------
+class ApplySettings(ctk.CTkFrame):
+    def __init__(self, parent, container):
+        super().__init__(container)
+        label = ctk.CTkLabel(self, text="Settings")
         label.grid(row = 0, column = 0, sticky = E, pady = 20, padx = 10)
 
 
