@@ -5,6 +5,7 @@ import customtkinter as ctk
 from flask import Flask
 from db_creation import db, user
 import bcrypt
+import atexit, os
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///C:/Users/balin/Desktop/SQLite_DB/net-management.db'
@@ -13,6 +14,14 @@ db.init_app(app)
 
 ctk.set_appearance_mode("dark") 
 ctk.set_default_color_theme("green")
+
+# class BaseFrame(ctk.CTkFrame):
+#     def __init__(self, master, *args, **kwargs):
+#         super().__init__(master, *args, **kwargs)
+#         self.create_widgets()
+
+#     def create_widgets(self):
+#         pass
 
 class App(ctk.CTk):
     def __init__(self):
@@ -44,13 +53,20 @@ class App(ctk.CTk):
             frame.grid(row=0, column=0, sticky = "nsew")    
            
         self.show_frame(LoginPage)
-
+        atexit.register(self.delete_json_file)
     def show_frame(self, cont):
         frame = self.frames[cont]
         menubar = frame.create_menubar(self)
         self.configure(menu=menubar)
         frame.tkraise()                         ## This line will put the frame on front
- 
+    
+    def delete_json_file(self):
+        file_path = "router_data.json"  # Specify the path to your JSON file
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            print(f"The file '{file_path}' has been deleted.")
+        else:
+            print(f"The file '{file_path}' does not exist.")
 #---------------------------------------- LOGINPAGE / CONTAINER ------------------------------------------------------------------------
         
 class LoginPage(ctk.CTkFrame):
@@ -193,10 +209,11 @@ class RouterDataPage(ctk.CTkFrame):
             except paramiko.AuthenticationException:
                 messagebox.showerror("Error","Wrong credentials")
                 return False
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to connect to the router: {str(e)}")
             finally:
                 client.close()
             
-
     def create_menubar(self, parent):
         menubar = Menu(parent, bd=3, relief=RAISED)
         return menubar
@@ -207,59 +224,60 @@ import paramiko
 class HomePage(ctk.CTkFrame):
     def __init__(self, parent, container):
         super().__init__(container)
+        self.create_widgets()
 
-        try:
-            with open('router_data.json') as data_file:
-                router_data = json.load(data_file)
+    def create_widgets(self):
+            try:
+                with open('router_data.json') as data_file:
+                    router_data = json.load(data_file)
 
-            command = "cat /tmp/dhcp.leases"
+                command = "cat /tmp/dhcp.leases"
 
-            host = router_data['ip_address']
-            username = router_data['router_user']
-            password = router_data['router_password']
-            client = paramiko.SSHClient()
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            client.connect(hostname=host, username=username, password=password)
+                host = router_data['ip_address']
+                username = router_data['router_user']
+                password = router_data['router_password']
+                client = paramiko.SSHClient()
+                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                client.connect(hostname=host, username=username, password=password)
 
-            stdin, stdout, stderr = client.exec_command(command)
-            active_clients = stdout.read().decode()
-            client.close()
-            dhcp_leases = []
-            for line in active_clients.split('\n'):
-                if line.strip():
-                    timestamp, mac_address, ip_address, hostname, client_id = line.split()
-                    dhcp_lease = {
-                        "timestamp": timestamp,
-                        "mac_address": mac_address,
-                        "ip_address": ip_address,
-                        "hostname": hostname,
-                        "client_id": client_id
-                    }
-                    dhcp_leases.append(dhcp_lease)
+                stdin, stdout, stderr = client.exec_command(command)
+                active_clients = stdout.read().decode()
+                client.close()
+                dhcp_leases = []
+                for line in active_clients.split('\n'):
+                    if line.strip():
+                        timestamp, mac_address, ip_address, hostname, client_id = line.split()
+                        dhcp_lease = {
+                            "timestamp": timestamp,
+                            "mac_address": mac_address,
+                            "ip_address": ip_address,
+                            "hostname": hostname,
+                            "client_id": client_id
+                        }
+                        dhcp_leases.append(dhcp_lease)
 
-            with open("active_clients.json", "w") as file:
-                json.dump(dhcp_leases, file, indent = 4)
+                with open("active_clients.json", "w") as file:
+                    json.dump(dhcp_leases, file, indent = 4)
 
-            self.columnconfigure(0, weight=1)
-            self.columnconfigure(1, weight=1)
+                self.columnconfigure(0, weight=1)
+                self.columnconfigure(1, weight=1)
 
-            label = ctk.CTkLabel(self, text="Home Page")
-            label.grid(row = 0, column = 0, sticky = E, pady = 20, padx = 10)
+                label = ctk.CTkLabel(self, text="Home Page")
+                label.grid(row = 0, column = 0, sticky = E, pady = 20, padx = 10)
 
-            for i, lease in enumerate(dhcp_leases):
-                client_info = f"MAC Address: {lease['mac_address']}\nIP Address: {lease['ip_address']}\nHostname: {lease['hostname']}\nClient ID: {lease['client_id']}"
-                label = ctk.CTkLabel(self, text=client_info)
-                label.grid(row=i+1, column=0, sticky = E, pady=30, padx=10)
-                button = ctk.CTkButton(self, text="Manage device")
-                button.grid(row=i+1, column=1, sticky = W, pady=45, padx=10)
-                # with open("active_clients.json", "w") as file:
-                #     json.dump(dhcp_leases, file, indent = 4)
-
-            dhcp_leases.clear()
-        except FileNotFoundError:
-            print("Fișierul JSON nu a fost găsit.")
+                for i, lease in enumerate(dhcp_leases):
+                    client_info = f"MAC Address: {lease['mac_address']}\nIP Address: {lease['ip_address']}\nHostname: {lease['hostname']}\nClient ID: {lease['client_id']}"
+                    label = ctk.CTkLabel(self, text=client_info)
+                    label.grid(row=i+1, column=0, sticky = E, pady=30, padx=10)
+                    button = ctk.CTkButton(self, text="Manage device")
+                    button.grid(row=i+1, column=1, sticky = W, pady=45, padx=10)
+                    # with open("active_clients.json", "w") as file:
+                    #     json.dump(dhcp_leases, file, indent = 4) 
+                #print('lol')
+            except FileNotFoundError:
+                print("Fișierul JSON nu a fost găsit.")
             
-        
+            self.after(1000, self.create_widgets)
 
     def create_menubar(self, parent):
         menubar = Menu(parent, bd=3, relief=RAISED)
