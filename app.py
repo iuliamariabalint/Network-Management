@@ -271,7 +271,7 @@ class HomePage(ctk.CTkFrame):
                 client_info = f"MAC Address: {lease['mac_address']}\nIP Address: {lease['ip_address']}\nHostname: {lease['hostname']}\nClient ID: {lease['client_id']}"
                 label = ctk.CTkLabel(self, text=client_info)
                 label.grid(row=i+1, column=0, sticky = E, pady=30, padx=10)
-                button = ctk.CTkButton(self, text="Manage device", command = lambda: parent.show_frame(parent.ApplySettings))
+                button = ctk.CTkButton(self, text="ADD", command = lambda: parent.show_frame(parent.ApplySettings))
                 button.grid(row=i+1, column=1, sticky = W, pady=45, padx=10)
                     # with open("active_clients.json", "w") as file:
                     #     json.dump(dhcp_leases, file, indent = 4) 
