@@ -228,8 +228,8 @@ class HomePage(ctk.CTkFrame):
     def __init__(self, parent, container):
         super().__init__(container)
 
+        self.parent_window = parent
         self.active_clients(parent)
-
         self.columnconfigure(0, weight=1)
         self.columnconfigure(1, weight=1)
 
@@ -271,13 +271,51 @@ class HomePage(ctk.CTkFrame):
                 client_info = f"MAC Address: {lease['mac_address']}\nIP Address: {lease['ip_address']}\nHostname: {lease['hostname']}\nClient ID: {lease['client_id']}"
                 label = ctk.CTkLabel(self, text=client_info)
                 label.grid(row=i+1, column=0, sticky = E, pady=30, padx=10)
-                button = ctk.CTkButton(self, text="ADD", command = lambda: parent.show_frame(parent.ApplySettings))
+                button = ctk.CTkButton(self, text="ADD", command = lambda info = lease: self.settings_modal(info))
                 button.grid(row=i+1, column=1, sticky = W, pady=45, padx=10)
-                    # with open("active_clients.json", "w") as file:
+                    # with open("active_clients.json", "w") as file: command = lambda: parent.show_frame(parent.ApplySettings)
                     #     json.dump(dhcp_leases, file, indent = 4) 
         except FileNotFoundError:
             print("Fișierul JSON nu a fost găsit.")
         self.after(1000, self.active_clients, parent)
+
+    def settings_modal(self, client_info):
+        modal = ctk.CTkToplevel(self.parent_window)  # Use ctk.CTkToplevel instead of tk.Toplevel
+        modal.configure(bg="#333333")
+        modal.title("Settings")
+        #modal.geometry("300x200")
+        # Calculate the position relative to the parent window
+        parent_x = self.parent_window.winfo_rootx()
+        parent_y = self.parent_window.winfo_rooty()
+        parent_width = self.parent_window.winfo_width()
+        parent_height = self.parent_window.winfo_height()
+
+        modal_x = parent_x + parent_width // 2 - 150  # Center the modal horizontally
+        modal_y = parent_y + parent_height // 2 - 100  # Center the modal vertically
+        modal.geometry(f"+{modal_x}+{modal_y}")
+
+        # Make the modal window transient to the parent window
+        modal.transient(self.parent_window)
+        # Grab the focus to the modal window
+        modal.grab_set()
+
+        hostname = client_info['hostname']
+        mac_addr = client_info['mac_address']
+
+        hostname_entry = ctk.CTkEntry(modal, width = len(hostname) * 7)
+        hostname_entry.insert(0, hostname)
+        hostname_entry.pack(pady=10)
+
+        mac_label = ctk.CTkLabel(modal, text = f"MAC Address: {mac_addr}")
+        mac_label.pack(pady = 5)
+
+        device_type = ['Router', 'Extender', 'Mobile', 'Laptop', 'Computer', 'TV', 'Other']
+        device_type_dropdown = ctk.CTkOptionMenu(modal, values = device_type)
+        device_type_dropdown.pack(pady = 5)
+        
+
+        add_button = ctk.CTkButton(modal, text="Add", command=modal.destroy)
+        add_button.pack(side="top", anchor="n", padx=5, pady=5)
 
     def create_menubar(self, parent):
         menubar = Menu(parent, bd=3, relief=RAISED)
