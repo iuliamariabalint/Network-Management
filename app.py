@@ -223,6 +223,7 @@ class RouterDataPage(ctk.CTkFrame):
 
 #---------------------------------------- HOME PAGE FRAME / CONTAINER ------------------------------------------------------------------------
 import paramiko
+from db_creation import device
 
 class HomePage(ctk.CTkFrame):
     def __init__(self, parent, container):
@@ -232,6 +233,7 @@ class HomePage(ctk.CTkFrame):
         self.active_clients(parent)
         self.columnconfigure(0, weight=1)
         self.columnconfigure(1, weight=1)
+        self.columnconfigure(2, weight=0)
 
         label = ctk.CTkLabel(self, text="Home Page")
         label.grid(row = 0, column = 0, sticky = E, pady = 20, padx = 10)
@@ -254,7 +256,10 @@ class HomePage(ctk.CTkFrame):
             active_clients = stdout.read().decode()
             client.close()
             dhcp_leases = []
-            for line in active_clients.split('\n'):
+            processed_macs = set()
+            
+
+            for i, line in enumerate(active_clients.split('\n')):
                 if line.strip():
                     timestamp, mac_address, ip_address, hostname, client_id = line.split()
                     dhcp_lease = {
@@ -265,25 +270,36 @@ class HomePage(ctk.CTkFrame):
                         "client_id": client_id
                     }
                     dhcp_leases.append(dhcp_lease)
-            with open("active_clients.json", "w") as file:
-                json.dump(dhcp_leases, file, indent = 4)
-            for i, lease in enumerate(dhcp_leases):
-                client_info = f"MAC Address: {lease['mac_address']}\nIP Address: {lease['ip_address']}\nHostname: {lease['hostname']}\nClient ID: {lease['client_id']}"
+                with open("active_clients.json", "w") as file:
+                    json.dump(dhcp_leases, file, indent = 4)
+
+                if mac_address in processed_macs:
+                    continue
+
+                processed_macs.add(mac_address)
+
+                client_info = f"MAC Address: {mac_address}\nIP Address: {ip_address}\nHostname: {hostname}\nClient ID: {client_id}"
                 label = ctk.CTkLabel(self, text=client_info)
                 label.grid(row=i+1, column=0, sticky = E, pady=30, padx=10)
-                button = ctk.CTkButton(self, text="ADD", command = lambda info = lease: self.settings_modal(info))
-                button.grid(row=i+1, column=1, sticky = W, pady=45, padx=10)
-                    # with open("active_clients.json", "w") as file: command = lambda: parent.show_frame(parent.ApplySettings)
-                    #     json.dump(dhcp_leases, file, indent = 4) 
+
+                existing_device = device.query.filter_by(MAC_address = mac_address).first()
+                if existing_device:
+                    manage_label = ctk.CTkLabel(self, text = "managed", text_color = "#5AD194", width=140)
+                    manage_label.grid(row=i+1, column=1, sticky=W, pady=45, padx=10)
+                else:
+                    button = ctk.CTkButton(self, text="manage", command = lambda info = dhcp_lease: self.settings_modal(info))
+                    button.grid(row=i+1, column=1, sticky = W, pady=45, padx=10)
+
         except FileNotFoundError:
             print("Fișierul JSON nu a fost găsit.")
         self.after(1000, self.active_clients, parent)
 
     def settings_modal(self, client_info):
-        modal = ctk.CTkToplevel(self.parent_window)  # Use ctk.CTkToplevel instead of tk.Toplevel
+        modal = ctk.CTkToplevel(self.parent_window)
         modal.configure(bg="#333333")
         modal.title("Settings")
         #modal.geometry("300x200")
+
         # Calculate the position relative to the parent window
         parent_x = self.parent_window.winfo_rootx()
         parent_y = self.parent_window.winfo_rooty()
@@ -302,20 +318,30 @@ class HomePage(ctk.CTkFrame):
         hostname = client_info['hostname']
         mac_addr = client_info['mac_address']
 
-        hostname_entry = ctk.CTkEntry(modal, width = len(hostname) * 7)
-        hostname_entry.insert(0, hostname)
-        hostname_entry.pack(pady=10)
+        devicename_entry = ctk.CTkEntry(modal, width = max(len(hostname) * 7, 100))
+        devicename_entry.insert(0, hostname)
+        devicename_entry.pack(pady=10)
 
         mac_label = ctk.CTkLabel(modal, text = f"MAC Address: {mac_addr}")
         mac_label.pack(pady = 5)
 
-        device_type = ['Router', 'Extender', 'Mobile', 'Laptop', 'Computer', 'TV', 'Other']
-        device_type_dropdown = ctk.CTkOptionMenu(modal, values = device_type)
+        device_types = ['Router', 'Extender', 'Mobile', 'Laptop', 'Computer', 'TV', 'Other']
+        device_type_dropdown = ctk.CTkOptionMenu(modal, values = device_types)
         device_type_dropdown.pack(pady = 5)
-        
 
-        add_button = ctk.CTkButton(modal, text="Add", command=modal.destroy)
+        def add_device(devicename, mac_addr, devicetype):
+            device_name = devicename.get()
+            device_type = devicetype.get()
+            
+            # Add device in database
+            device_ = device(device_name = device_name, MAC_address = mac_addr, device_type = device_type)
+            db.session.add(device_)
+            db.session.commit()
+            modal.destroy()
+
+        add_button = ctk.CTkButton(modal, text="Add", command = lambda: add_device(devicename_entry, mac_addr, device_type_dropdown))
         add_button.pack(side="top", anchor="n", padx=5, pady=5)
+
 
     def create_menubar(self, parent):
         menubar = Menu(parent, bd=3, relief=RAISED)
