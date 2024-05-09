@@ -233,7 +233,6 @@ class HomePage(ctk.CTkFrame):
         self.active_clients(parent)
         self.columnconfigure(0, weight=1)
         self.columnconfigure(1, weight=1)
-        self.columnconfigure(2, weight=0)
 
         label = ctk.CTkLabel(self, text="Home Page")
         label.grid(row = 0, column = 0, sticky = E, pady = 20, padx = 10)
@@ -297,7 +296,7 @@ class HomePage(ctk.CTkFrame):
     def settings_modal(self, client_info):
         modal = ctk.CTkToplevel(self.parent_window)
         modal.configure(bg="#333333")
-        modal.title("Settings")
+        modal.title("Device data")
         #modal.geometry("300x200")
 
         # Calculate the position relative to the parent window
@@ -332,7 +331,7 @@ class HomePage(ctk.CTkFrame):
         def add_device(devicename, mac_addr, devicetype):
             device_name = devicename.get()
             device_type = devicetype.get()
-            
+
             # Add device in database
             device_ = device(device_name = device_name, MAC_address = mac_addr, device_type = device_type)
             db.session.add(device_)
@@ -350,6 +349,7 @@ class HomePage(ctk.CTkFrame):
         filemenu = Menu(menubar, tearoff=0, relief=RAISED)
         menubar.add_cascade(label="Devices", menu=filemenu)
         filemenu.add_command(label="Managed devices", command=lambda: parent.show_frame(parent.ManagedDevices))
+        filemenu.add_command(label="Settings", command=lambda: parent.show_frame(parent.ApplySettings))
         filemenu.add_separator()
         filemenu.add_command(label="Exit", command=parent.quit)  
 
@@ -362,11 +362,32 @@ class HomePage(ctk.CTkFrame):
         return menubar
 
 #-----------------------------------------------------MANAGED DEVICES FRAME / CONTAINER --------------------------------------------------
+
 class ManagedDevices(ctk.CTkFrame):
     def __init__(self, parent, container):
         super().__init__(container)
+
+        self.get_and_show_devices(parent)
+        self.columnconfigure(0, weight=1)
+        self.columnconfigure(1, weight=1)
+
         label = ctk.CTkLabel(self, text="Managed Devices")
         label.grid(row = 0, column = 0, sticky = E, pady = 20, padx = 10)
+
+
+    def get_and_show_devices(self, parent):
+
+        devices = db.session.query(device.device_name, device.MAC_address, device.device_type).all()
+        for i, dev in enumerate(devices):
+            device_data = f"{dev.device_name}\nMAC address: {dev.MAC_address}\nDevice type: {dev.device_type}"
+
+            label = ctk.CTkLabel(self, text=device_data)
+            label.grid(row=i+1, column=0, sticky=E, pady=45, padx=10)
+
+            # button_command = partial(self.navigate_to_page, parent, setting_name)
+            # button = ctk.CTkButton(self, text = name, command = button_command)
+            # button.grid(row=i+1, column=0, sticky = N, pady=15, padx=10)
+        self.after(2000, self.get_and_show_devices, parent)
 
 
     def create_menubar(self, parent):
@@ -388,10 +409,9 @@ class ManagedDevices(ctk.CTkFrame):
         return menubar
 
 #---------------------------------------------------APPLY SETTINGS FRAME / CONTAINER --------------------------------------------------
-import sqlite3
 from functools import partial
-conn = sqlite3.connect('C:/Users/balin/Desktop/SQLite_DB/net-management.db')
-cursor = conn.cursor()
+from db_creation import settings
+
 class ApplySettings(ctk.CTkFrame):
     def __init__(self, parent, container):
         super().__init__(container)
@@ -404,21 +424,17 @@ class ApplySettings(ctk.CTkFrame):
         label.grid(row = 0, column = 0, sticky = N, pady = 20, padx = 10)
 
     def get_and_show_settings(self, parent):
-        sql_query = "SELECT setting_name, description FROM settings"
-        cursor.execute(sql_query)
-        settings_list = cursor.fetchall()
+        settings_list = db.session.query(settings.setting_name, settings.description).all()
 
         for i, setting in enumerate(settings_list):
-            setting_name, description = setting
-            description = f"{description}"
-            name = f"{setting_name}"
-            button_command = partial(self.navigate_to_page, parent, setting_name)
+
+            description = f"{setting.description}"
+            name = f"{setting.setting_name}"
+            button_command = partial(self.navigate_to_page, parent, setting.setting_name)
             button = ctk.CTkButton(self, text = name, command = button_command)
             button.grid(row=i+1, column=0, sticky = N, pady=15, padx=10)
             label = ctk.CTkLabel(self, text=description)
             label.grid(row=i+1, column=0, sticky=N, pady=45, padx=10)
-        cursor.close()
-        conn.close()
 
     def navigate_to_page(self, parent, setting_name):
 
