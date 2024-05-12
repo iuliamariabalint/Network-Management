@@ -380,12 +380,12 @@ class ManagedDevices(ctk.CTkFrame):
             label = ctk.CTkLabel(self, text=device_data)
             label.grid(row=i+1, column=0, sticky=E, pady=45, padx=10)
 
-            button = ctk.CTkButton(self, text="edit", command= lambda info = dev : self.settings_modal(info))
-            button.grid(row=i+1, column=1, sticky = W, pady=45, padx=10)
-            # button_command = partial(self.navigate_to_page, parent, setting_name)
-            # button = ctk.CTkButton(self, text = name, command = button_command)
-            # button.grid(row=i+1, column=0, sticky = N, pady=15, padx=10)
+            edit_button = ctk.CTkButton(self, text="edit", command= lambda info = dev : self.settings_modal(info))
+            edit_button.grid(row=i+1, column=1, sticky = NW, pady=45, padx=10)
+
+
         self.after(2000, self.get_and_show_devices, parent)
+
 
     def settings_modal(self, device_info):
 
@@ -426,6 +426,16 @@ class ManagedDevices(ctk.CTkFrame):
         device_types = ['Router', 'Extender', 'Mobile', 'Laptop', 'Computer', 'TV', 'Other']
         device_type_dropdown = ctk.CTkOptionMenu(modal, variable = device_type_var, values = device_types)
         device_type_dropdown.pack(pady = 5)
+
+        delete_button = ctk.CTkButton(modal, fg_color="transparent", hover_color="#F24A3B", text="delete", command = lambda: delete(mac_address))
+        delete_button.pack(pady = 5)
+
+        def delete(mac_addr):
+            existing_device = device.query.filter_by(MAC_address = mac_addr).first()
+            if existing_device:
+                db.session.delete(existing_device)
+                db.session.commit()
+                modal.destroy()
 
         def edit_device(devicename, mac_addr, devicetype):
             device_name = devicename.get()
