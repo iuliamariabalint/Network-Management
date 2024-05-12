@@ -367,11 +367,13 @@ class ManagedDevices(ctk.CTkFrame):
         self.columnconfigure(0, weight=1)
         self.columnconfigure(1, weight=1)
 
-        label = ctk.CTkLabel(self, text="Managed Devices")
-        label.grid(row = 0, column = 0, sticky = E, pady = 20, padx = 10)
-
-
     def get_and_show_devices(self, parent):
+        
+        for widget in self.grid_slaves():
+            widget.grid_remove()
+        
+        label = ctk.CTkLabel(self, text="Managed Devices")
+        label.grid(row = 0, sticky = E, pady = 20, padx = 10)
 
         devices = db.session.query(device.device_name, device.MAC_address, device.device_type).all()
         for i, dev in enumerate(devices):
@@ -381,7 +383,7 @@ class ManagedDevices(ctk.CTkFrame):
             label.grid(row=i+1, column=0, sticky=E, pady=45, padx=10)
 
             edit_button = ctk.CTkButton(self, text="edit", command= lambda info = dev : self.settings_modal(info))
-            edit_button.grid(row=i+1, column=1, sticky = NW, pady=45, padx=10)
+            edit_button.grid(row=i+1, column=1, sticky = NW, pady=55, padx=10)
 
 
         self.after(2000, self.get_and_show_devices, parent)
@@ -427,15 +429,16 @@ class ManagedDevices(ctk.CTkFrame):
         device_type_dropdown = ctk.CTkOptionMenu(modal, variable = device_type_var, values = device_types)
         device_type_dropdown.pack(pady = 5)
 
-        delete_button = ctk.CTkButton(modal, fg_color="transparent", hover_color="#F24A3B", text="delete", command = lambda: delete(mac_address))
+        delete_button = ctk.CTkButton(modal, fg_color="transparent", hover_color="#F24A3B", text="delete", command = lambda: delete(mac_address, self.parent_window))
         delete_button.pack(pady = 5)
 
-        def delete(mac_addr):
+        def delete(mac_addr, parent):
             existing_device = device.query.filter_by(MAC_address = mac_addr).first()
             if existing_device:
                 db.session.delete(existing_device)
                 db.session.commit()
                 modal.destroy()
+                self.get_and_show_devices(parent)
 
         def edit_device(devicename, mac_addr, devicetype):
             device_name = devicename.get()
