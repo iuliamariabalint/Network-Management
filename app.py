@@ -265,8 +265,11 @@ class HomePage(ctk.CTkFrame):
                 with open("active_clients.json", "w") as file:
                     json.dump(dhcp_leases, file, indent = 4)
 
-                if mac_address in processed_macs:
-                    continue
+                try: 
+                    if mac_address in processed_macs:
+                        continue
+                except:
+                    return None
 
                 processed_macs.add(mac_address)
 
