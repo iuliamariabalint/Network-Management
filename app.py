@@ -40,16 +40,18 @@ class App(ctk.CTk):
         self.RouterDataPage = RouterDataPage
         self.HomePage = HomePage
         self.ManagedDevices = ManagedDevices
+        self.DeviceSettings = DeviceSettings
         self.ApplySettings = ApplySettings
 
         ## Defining Frames and Packing it
-        for F in {LoginPage, SignupPage, RouterDataPage, HomePage, ManagedDevices, ApplySettings}:
+        for F in {LoginPage, SignupPage, RouterDataPage, HomePage, ManagedDevices, ApplySettings, DeviceSettings}:
             frame = F(self, container)
             self.frames[F] = frame
             frame.grid(row=0, column=0, sticky = "nsew")    
            
         self.show_frame(LoginPage)
         atexit.register(self.delete_json_file)
+        
     def show_frame(self, cont):
         frame = self.frames[cont]
         menubar = frame.create_menubar(self)
@@ -382,79 +384,17 @@ class ManagedDevices(ctk.CTkFrame):
             label = ctk.CTkLabel(self, text=device_data)
             label.grid(row=i+1, column=0, sticky=E, pady=45, padx=10)
 
-            edit_button = ctk.CTkButton(self, text="edit", command= lambda info = dev : self.settings_modal(info))
+            edit_button = ctk.CTkButton(self, text="edit", command= lambda dev = dev : self.edit_device(dev))
             edit_button.grid(row=i+1, column=1, sticky = NW, pady=55, padx=10)
 
 
         self.after(2000, self.get_and_show_devices, parent)
 
+    def edit_device(self, dev):
+        parent_container = self.master
+        edit_frame = DeviceSettings(self.parent_window, parent_container,  device_info = dev)
+        edit_frame.grid(row=0, column=0, sticky = "nsew")
 
-    def settings_modal(self, device_info):
-
-        modal = ctk.CTkToplevel(self.parent_window)
-        modal.configure(bg="#333333")
-        modal.title("Device data")
-        #modal.geometry("300x200")
-
-        # Calculate the position relative to the parent window
-        parent_x = self.parent_window.winfo_rootx()
-        parent_y = self.parent_window.winfo_rooty()
-        parent_width = self.parent_window.winfo_width()
-        parent_height = self.parent_window.winfo_height()
-
-        modal_x = parent_x + parent_width // 2 - 150  # Center the modal horizontally
-        modal_y = parent_y + parent_height // 2 - 100  # Center the modal vertically
-        modal.geometry(f"+{modal_x}+{modal_y}")
-
-        # Make the modal window transient to the parent window
-        modal.transient(self.parent_window)
-        # Grab the focus to the modal window
-        modal.grab_set()
-
-        # Extract the device name, MAC address, and device type from the selected device tuple
-        device_name, mac_address, device_type = device_info
-
-        # Create an entry for the device name
-        devicename_entry = ctk.CTkEntry(modal)
-        devicename_entry.insert(0, device_name)
-        devicename_entry.pack(pady=10)
-
-        # Create a label for the MAC address
-        mac_label = ctk.CTkLabel(modal, text=f"MAC Address: {mac_address}")
-        mac_label.pack(pady=5)
-
-        device_type_var = ctk.StringVar(self)
-        device_type_var.set(device_type)  # Default value
-        device_types = ['Router', 'Extender', 'Mobile', 'Laptop', 'Computer', 'TV', 'Other']
-        device_type_dropdown = ctk.CTkOptionMenu(modal, variable = device_type_var, values = device_types)
-        device_type_dropdown.pack(pady = 5)
-
-        delete_button = ctk.CTkButton(modal, fg_color="transparent", hover_color="#F24A3B", text="delete", command = lambda: delete(mac_address, self.parent_window))
-        delete_button.pack(pady = 5)
-
-        def delete(mac_addr, parent):
-            existing_device = device.query.filter_by(MAC_address = mac_addr).first()
-            if existing_device:
-                db.session.delete(existing_device)
-                db.session.commit()
-                modal.destroy()
-                self.get_and_show_devices(parent)
-
-        def edit_device(devicename, mac_addr, devicetype):
-            device_name = devicename.get()
-            device_type = devicetype.get()
-            existing_device = device.query.filter_by(MAC_address = mac_addr).first()
-            if existing_device:
-                db.session.delete(existing_device)
-                db.session.commit()
-            # Add device in database
-            edited_device = device(device_name = device_name, MAC_address = mac_addr, device_type = device_type)
-            db.session.add(edited_device)
-            db.session.commit()
-            modal.destroy()
-
-        done_button = ctk.CTkButton(modal, text="done", command = lambda: edit_device(devicename_entry, mac_address, device_type_dropdown))
-        done_button.pack(side="top", anchor="n", padx=5, pady=5)
 
     def create_menubar(self, parent):
         menubar = Menu(parent, bd=3, relief=RAISED)
@@ -474,6 +414,85 @@ class ManagedDevices(ctk.CTkFrame):
 
         return menubar
 
+#---------------------------------------------------DEVICE SETTINGS FRAME / CONTAINER --------------------------------------------------
+class DeviceSettings(ctk.CTkFrame):
+    def __init__(self, parent, container, device_info = ("", "", ""), *args, **kwargs):
+        super().__init__(container, *args, **kwargs)
+        back_button = ctk.CTkButton(self, text = "\u2190", command=lambda: parent.show_frame(ManagedDevices), text_color = "white", fg_color = "transparent", hover_color = "#544D4D")
+        back_button.pack(side="top", anchor="ne", padx=10, pady=10)
+        title = ctk.CTkLabel(self, text="Device Settings")
+        title.pack(pady = 5, padx = 10)
+
+        self.parent = parent
+        self.device_info = device_info
+        self.create_widgets()
+
+    def create_widgets(self):
+        # Extract the device name, MAC address, and device type from the device_info tuple
+        device_name, mac_address, device_type = self.device_info
+
+        # Create an entry for the device name
+        devicename_entry = ctk.CTkEntry(self, width = max(len(device_name) * 7, 100))
+        devicename_entry.insert(0, device_name)
+        devicename_entry.pack(pady=10)
+
+        # Create a label for the MAC address
+        mac_label = ctk.CTkLabel(self, text=f"MAC Address: {mac_address}")
+        mac_label.pack(pady=5)
+
+        # Create a dropdown menu for selecting device type
+        device_type_var = ctk.StringVar(self)
+        device_type_var.set(device_type)  # Default value
+        device_types = ['Router', 'Extender', 'Mobile', 'Laptop', 'Computer', 'TV', 'Other']
+        device_type_dropdown = ctk.CTkOptionMenu(self, variable=device_type_var, values=device_types)
+        device_type_dropdown.pack(pady=5)
+
+        delete_button = ctk.CTkButton(self, fg_color="transparent", hover_color="#F24A3B", text="delete", command = lambda: delete(mac_address, self.parent))
+        delete_button.pack(pady = 5)
+
+        done_button = ctk.CTkButton(self, text="done", command = lambda: edit_device(self.parent, devicename_entry, mac_address, device_type_dropdown))
+        done_button.pack(side="top", anchor="n", padx=5, pady=5)
+
+
+
+        def delete(mac_addr, parent):
+            existing_device = device.query.filter_by(MAC_address = mac_addr).first()
+            if existing_device:
+                db.session.delete(existing_device)
+                db.session.commit()
+                parent.show_frame(ManagedDevices)
+    
+        def edit_device(parent, devicename, mac_addr, devicetype):
+            device_name = devicename.get()
+            device_type = devicetype.get()
+            existing_device = device.query.filter_by(MAC_address = mac_addr).first()
+            if existing_device:
+                db.session.delete(existing_device)
+                db.session.commit()
+            # Add device in database
+            edited_device = device(device_name = device_name, MAC_address = mac_addr, device_type = device_type)
+            db.session.add(edited_device)
+            db.session.commit()
+            parent.show_frame(ManagedDevices)
+
+
+    def create_menubar(self, parent):
+        menubar = Menu(parent, bd=3, relief=RAISED)
+
+        ## Filemenu
+        filemenu = Menu(menubar, tearoff=0, relief=RAISED)
+        menubar.add_cascade(label="Devices", menu=filemenu)
+        filemenu.add_command(label="Connected devices", command=lambda: parent.show_frame(parent.HomePage))
+        filemenu.add_separator()
+        filemenu.add_command(label="Exit", command=parent.quit)  
+
+        ## help menu
+        help_menu = Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Help", menu=help_menu)
+        help_menu.add_command(label="About")
+        help_menu.add_separator()
+
+        return menubar
 #---------------------------------------------------APPLY SETTINGS FRAME / CONTAINER --------------------------------------------------
 from functools import partial
 from db_creation import settings
