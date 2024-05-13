@@ -41,10 +41,10 @@ class App(ctk.CTk):
         self.HomePage = HomePage
         self.ManagedDevices = ManagedDevices
         self.DeviceSettings = DeviceSettings
-        self.ApplySettings = ApplySettings
+        self.Settings = Settings
 
         ## Defining Frames and Packing it
-        for F in {LoginPage, SignupPage, RouterDataPage, HomePage, ManagedDevices, ApplySettings, DeviceSettings}:
+        for F in {LoginPage, SignupPage, RouterDataPage, HomePage, ManagedDevices, Settings, DeviceSettings}:
             frame = F(self, container)
             self.frames[F] = frame
             frame.grid(row=0, column=0, sticky = "nsew")    
@@ -324,6 +324,7 @@ class HomePage(ctk.CTkFrame):
 
         device_types = ['Router', 'Extender', 'Mobile', 'Laptop', 'Computer', 'TV', 'Other']
         device_type_dropdown = ctk.CTkOptionMenu(modal, values = device_types)
+        device_type_dropdown.set("Select Device Type")
         device_type_dropdown.pack(pady = 5)
 
         def add_device(devicename, mac_addr, devicetype):
@@ -347,7 +348,7 @@ class HomePage(ctk.CTkFrame):
         filemenu = Menu(menubar, tearoff=0, relief=RAISED)
         menubar.add_cascade(label="Devices", menu=filemenu)
         filemenu.add_command(label="Managed devices", command=lambda: parent.show_frame(parent.ManagedDevices))
-        filemenu.add_command(label="Settings", command=lambda: parent.show_frame(parent.ApplySettings))
+        filemenu.add_command(label="Settings", command=lambda: parent.show_frame(parent.Settings))
         filemenu.add_separator()
         filemenu.add_command(label="Exit", command=parent.quit)  
 
@@ -403,6 +404,7 @@ class ManagedDevices(ctk.CTkFrame):
         filemenu = Menu(menubar, tearoff=0, relief=RAISED)
         menubar.add_cascade(label="Devices", menu=filemenu)
         filemenu.add_command(label="Connected devices", command=lambda: parent.show_frame(parent.HomePage))
+        filemenu.add_command(label="Settings", command=lambda: parent.show_frame(parent.Settings))
         filemenu.add_separator()
         filemenu.add_command(label="Exit", command=parent.quit)  
 
@@ -475,31 +477,18 @@ class DeviceSettings(ctk.CTkFrame):
             db.session.commit()
             parent.show_frame(ManagedDevices)
 
-
-    def create_menubar(self, parent):
-        menubar = Menu(parent, bd=3, relief=RAISED)
-
-        ## Filemenu
-        filemenu = Menu(menubar, tearoff=0, relief=RAISED)
-        menubar.add_cascade(label="Devices", menu=filemenu)
-        filemenu.add_command(label="Connected devices", command=lambda: parent.show_frame(parent.HomePage))
-        filemenu.add_separator()
-        filemenu.add_command(label="Exit", command=parent.quit)  
-
-        ## help menu
-        help_menu = Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Help", menu=help_menu)
-        help_menu.add_command(label="About")
-        help_menu.add_separator()
-
-        return menubar
-#---------------------------------------------------APPLY SETTINGS FRAME / CONTAINER --------------------------------------------------
+    # def create_menubar(self, parent):
+    #     menubar = Menu(parent, bd=3, relief=RAISED)
+    #     return menubar
+#---------------------------------------------------SETTINGS FRAME / CONTAINER --------------------------------------------------
 from functools import partial
 from db_creation import settings
+from tkinter import ttk
 
-class ApplySettings(ctk.CTkFrame):
+class Settings(ctk.CTkFrame):
     def __init__(self, parent, container):
         super().__init__(container)
+        self.parent_window = parent
 
         self.get_and_show_settings(parent)
         
@@ -515,26 +504,106 @@ class ApplySettings(ctk.CTkFrame):
 
             description = f"{setting.description}"
             name = f"{setting.setting_name}"
-            button_command = partial(self.navigate_to_page, parent, setting.setting_name)
+            button_command = partial(self.open_modal, parent, setting.setting_name)
             button = ctk.CTkButton(self, text = name, command = button_command)
             button.grid(row=i+1, column=0, sticky = N, pady=15, padx=10)
             label = ctk.CTkLabel(self, text=description)
             label.grid(row=i+1, column=0, sticky=N, pady=45, padx=10)
 
-    def navigate_to_page(self, parent, setting_name):
-
-        page_mapping = {
-            "Block Network Access": parent.ManagedDevices,
-            "Network Usage Scheduler": parent.LoginPage,
+    def open_modal(self, parent, setting_name):
+        modal_functions = {
+            "Block Network Access": self.block_access_modal,
+            "Network Usage Scheduler": self.time_restriction_modal,
         }
 
-        # Get the page class corresponding to the setting_name
-        page_class = page_mapping.get(setting_name)
+        modal_function = modal_functions.get(setting_name)
 
-        if page_class:
-            parent.show_frame(page_class)
+        if modal_function:
+            modal_function()
         else:
-            print("Page not found for setting:", setting_name)
+            print("Modal function not found for setting:", setting_name)
+
+    def block_access_modal(self):
+        pass
+
+    def time_restriction_modal(self):
+        modal = ctk.CTkToplevel(self.parent_window)
+        modal.configure(bg="#333333")
+        modal.title("Setting")
+
+        # Calculate the position relative to the parent window
+        parent_x = self.parent_window.winfo_rootx()
+        parent_y = self.parent_window.winfo_rooty()
+        parent_width = self.parent_window.winfo_width()
+        parent_height = self.parent_window.winfo_height()
+
+        modal_x = parent_x + parent_width // 2 - 150  # Center the modal horizontally
+        modal_y = parent_y + parent_height // 2 - 100  # Center the modal vertically
+        modal.geometry(f"+{modal_x}+{modal_y}")
+
+        # Make the modal window transient to the parent window
+        modal.transient(self.parent_window)
+        # Grab the focus to the modal window
+        modal.grab_set()
+
+        title = ctk.CTkLabel(modal, text = "Time Restriction Setting")
+        title.grid(pady = 5)
+
+        setting_name = "Filter-Parental-Controls"
+        # mac_addr = client_info['mac_address']
+
+        settingname_entry = ctk.CTkEntry(modal, width = max(len(setting_name) * 7, 100))
+        settingname_entry.insert(0, setting_name)
+        settingname_entry.grid(pady=10)
+
+        src = ctk.CTkLabel(modal, text = "Source zone: lan")
+        src.grid(pady=10)
+
+        devices = db.session.query(device.device_name, device.MAC_address).all()
+        device_info = {name: mac for name, mac in devices}
+
+
+        def on_device_selected(event):
+            selected_device = device_dropdown.get()
+            selected_mac_address = device_info.get(selected_device)
+            if selected_mac_address:
+                mac_label.configure(text=f"MAC Address: {selected_mac_address}")
+            else:
+                print("MAC address not found for device:", selected_device)#
+        
+        device_dropdown = ttk.Combobox(modal, values=list(device_info.keys()), width = 30, state = "readonly")
+        device_dropdown.set("Select Device")
+        device_dropdown.grid(padx=10, pady=10)
+
+        mac_label = ctk.CTkLabel(modal, text="MAC Address: ")
+        mac_label.grid(padx=10, pady=10)
+
+        device_dropdown.bind("<<ComboboxSelected>>", on_device_selected)
+
+
+
+
+
+
+        # mac_label = ctk.CTkLabel(modal, text = f"MAC Address: {mac_addr}")
+        # mac_label.pack(pady = 5)
+
+        # device_types = ['Router', 'Extender', 'Mobile', 'Laptop', 'Computer', 'TV', 'Other']
+        # device_type_dropdown = ctk.CTkOptionMenu(modal, values = device_types)
+        # device_type_dropdown.pack(pady = 5)
+
+        # def add_device(devicename, mac_addr, devicetype):
+        #     device_name = devicename.get()
+        #     device_type = devicetype.get()
+
+        #     # Add device in database
+        #     device_ = device(device_name = device_name, MAC_address = mac_addr, device_type = device_type)
+        #     db.session.add(device_)
+        #     db.session.commit()
+        #     modal.destroy()
+
+        # add_button = ctk.CTkButton(modal, text="Add", command = lambda: add_device(devicename_entry, mac_addr, device_type_dropdown))
+        # add_button.pack(side="top", anchor="n", padx=5, pady=5)
 
     def create_menubar(self, parent):
         menubar = Menu(parent, bd=3, relief=RAISED)
