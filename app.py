@@ -103,9 +103,7 @@ class LoginPage(ctk.CTkFrame):
                 messagebox.showerror("Login Failed", "Username not found.")
 
     def create_menubar(self, parent):
-        menubar = Menu(parent, bd=3, relief=RAISED)
-        return menubar
-        
+        pass
 #---------------------------------------- SIGNUP-PAGE / CONTAINER ------------------------------------------------------------------------
 
 class SignupPage(ctk.CTkFrame):
@@ -162,8 +160,7 @@ class SignupPage(ctk.CTkFrame):
             return hashed_password.decode('utf-8')
     
     def create_menubar(self, parent):
-        menubar = Menu(parent, bd=3, relief=RAISED)
-        return menubar
+        pass
 
 #---------------------------------------- ROUTER-DATA-PAGE / CONTAINER ------------------------------------------------------------------------
 import json
@@ -213,8 +210,7 @@ class RouterDataPage(ctk.CTkFrame):
                 client.close()
             
     def create_menubar(self, parent):
-        menubar = Menu(parent, bd=3, relief=RAISED)
-        return menubar
+        pass
 
 #---------------------------------------- HOME PAGE FRAME / CONTAINER ------------------------------------------------------------------------
 import paramiko
@@ -331,7 +327,6 @@ class HomePage(ctk.CTkFrame):
             device_name = devicename.get()
             device_type = devicetype.get()
             if device_type in device_types:
-
                 # Add device in database
                 device_ = device(device_name = device_name, MAC_address = mac_addr, device_type = device_type)
                 db.session.add(device_)
@@ -348,19 +343,17 @@ class HomePage(ctk.CTkFrame):
     def create_menubar(self, parent):
         menubar = Menu(parent, bd=3, relief=RAISED)
 
-        ## Filemenu
         filemenu = Menu(menubar, tearoff=0, relief=RAISED)
         menubar.add_cascade(label="Devices", menu=filemenu)
         filemenu.add_command(label="Managed devices", command=lambda: parent.show_frame(parent.ManagedDevices))
-        filemenu.add_command(label="Settings", command=lambda: parent.show_frame(parent.Settings))
-        filemenu.add_separator()
-        filemenu.add_command(label="Exit", command=parent.quit)  
+        filemenu.add_command(label="Settings", command=lambda: parent.show_frame(parent.Settings)) 
 
         ## help menu
         help_menu = Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Help", menu=help_menu)
         help_menu.add_command(label="About")
         help_menu.add_separator()
+        help_menu.add_command(label="Exit", command=parent.quit) 
 
         return menubar
 
@@ -404,19 +397,17 @@ class ManagedDevices(ctk.CTkFrame):
     def create_menubar(self, parent):
         menubar = Menu(parent, bd=3, relief=RAISED)
 
-        ## Filemenu
         filemenu = Menu(menubar, tearoff=0, relief=RAISED)
         menubar.add_cascade(label="Devices", menu=filemenu)
         filemenu.add_command(label="Connected devices", command=lambda: parent.show_frame(parent.HomePage))
         filemenu.add_command(label="Settings", command=lambda: parent.show_frame(parent.Settings))
-        filemenu.add_separator()
-        filemenu.add_command(label="Exit", command=parent.quit)  
-
+ 
         ## help menu
         help_menu = Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Help", menu=help_menu)
         help_menu.add_command(label="About")
         help_menu.add_separator()
+        help_menu.add_command(label="Exit", command=parent.quit) 
 
         return menubar
 
@@ -431,9 +422,9 @@ class DeviceSettings(ctk.CTkFrame):
 
         self.parent = parent
         self.device_info = device_info
-        self.create_widgets()
+        self.show_device_settings()
 
-    def create_widgets(self):
+    def show_device_settings(self):
         # Extract the device name, MAC address, and device type from the device_info tuple
         device_name, mac_address, device_type = self.device_info
 
@@ -448,7 +439,7 @@ class DeviceSettings(ctk.CTkFrame):
 
         # Create a dropdown menu for selecting device type
         device_type_var = ctk.StringVar(self)
-        device_type_var.set(device_type)  # Default value
+        device_type_var.set(device_type)
         device_types = ['Router', 'Extender', 'Mobile', 'Laptop', 'Computer', 'TV', 'Other']
         device_type_dropdown = ctk.CTkOptionMenu(self, variable=device_type_var, values=device_types)
         device_type_dropdown.pack(pady=5)
@@ -458,8 +449,6 @@ class DeviceSettings(ctk.CTkFrame):
 
         done_button = ctk.CTkButton(self, text="done", command = lambda: edit_device(self.parent, devicename_entry, mac_address, device_type_dropdown))
         done_button.pack(side="top", anchor="n", padx=5, pady=5)
-
-
 
         def delete(mac_addr, parent):
             existing_device = device.query.filter_by(MAC_address = mac_addr).first()
@@ -481,9 +470,6 @@ class DeviceSettings(ctk.CTkFrame):
             db.session.commit()
             parent.show_frame(ManagedDevices)
 
-    # def create_menubar(self, parent):
-    #     menubar = Menu(parent, bd=3, relief=RAISED)
-    #     return menubar
 #---------------------------------------------------SETTINGS FRAME / CONTAINER --------------------------------------------------
 from functools import partial
 from db_creation import settings
@@ -659,7 +645,7 @@ class Settings(ctk.CTkFrame):
         action = ctk.CTkLabel(modal, text = f"Action: {target}")
         action.grid(pady=10)
 
-        done_button = ctk.CTkButton(self, text="done")
+        done_button = ctk.CTkButton(modal, text="done")
         done_button.grid(padx=5, pady=5) 
 
         important = ctk.CTkLabel(modal, text = "ATENTION: The router time zone is GMT", text_color="red")
@@ -669,18 +655,16 @@ class Settings(ctk.CTkFrame):
     def create_menubar(self, parent):
         menubar = Menu(parent, bd=3, relief=RAISED)
 
-        ## Filemenu
         filemenu = Menu(menubar, tearoff=0, relief=RAISED)
         menubar.add_cascade(label="Devices", menu=filemenu)
         filemenu.add_command(label="Connected devices", command=lambda: parent.show_frame(parent.HomePage))
-        filemenu.add_separator()
-        filemenu.add_command(label="Exit", command=parent.quit)  
-
-        ## help menu
+        filemenu.add_command(label="Managed devices", command=lambda: parent.show_frame(parent.ManagedDevices))
+  
         help_menu = Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Help", menu=help_menu)
         help_menu.add_command(label="About")
         help_menu.add_separator()
+        help_menu.add_command(label="Exit", command=parent.quit)
 
         return menubar
 
