@@ -289,7 +289,7 @@ class HomePage(ctk.CTkFrame):
 
         except FileNotFoundError:
             print("Fișierul JSON nu a fost găsit.")
-        self.after(1000, self.active_clients, parent)
+        self.after(5000, self.active_clients, parent)
 
     def settings_modal(self, client_info):
         modal = ctk.CTkToplevel(self.parent_window)
@@ -330,12 +330,16 @@ class HomePage(ctk.CTkFrame):
         def add_device(devicename, mac_addr, devicetype):
             device_name = devicename.get()
             device_type = devicetype.get()
+            if device_type in device_types:
 
-            # Add device in database
-            device_ = device(device_name = device_name, MAC_address = mac_addr, device_type = device_type)
-            db.session.add(device_)
-            db.session.commit()
-            modal.destroy()
+                # Add device in database
+                device_ = device(device_name = device_name, MAC_address = mac_addr, device_type = device_type)
+                db.session.add(device_)
+                db.session.commit()
+                modal.destroy()
+            else: 
+                messagebox.showerror("Error", "Please select a device type.")
+
 
         add_button = ctk.CTkButton(modal, text="Add", command = lambda: add_device(devicename_entry, mac_addr, device_type_dropdown))
         add_button.pack(side="top", anchor="n", padx=5, pady=5)
@@ -389,7 +393,7 @@ class ManagedDevices(ctk.CTkFrame):
             edit_button.grid(row=i+1, column=1, sticky = NW, pady=55, padx=10)
 
 
-        self.after(2000, self.get_and_show_devices, parent)
+        self.after(3000, self.get_and_show_devices, parent)
 
     def edit_device(self, dev):
         parent_container = self.master
@@ -625,7 +629,7 @@ class Settings(ctk.CTkFrame):
                 src_mac = selected_mac_address
                 print("stored mac = ", src_mac)
             else:
-                print("MAC address not found for device:", selected_device)#
+                print("MAC address not found for device:", selected_device)
         
         device_dropdown = ttk.Combobox(modal, values=list(device_info.keys()), width = 30, state = "readonly")
         device_dropdown.set("Select Device")
@@ -655,7 +659,10 @@ class Settings(ctk.CTkFrame):
         action = ctk.CTkLabel(modal, text = f"Action: {target}")
         action.grid(pady=10)
 
-        important = ctk.CTkLabel(modal, text = "Important: The router time zone is GMT", text_color="red")
+        done_button = ctk.CTkButton(self, text="done")
+        done_button.grid(padx=5, pady=5) 
+
+        important = ctk.CTkLabel(modal, text = "ATENTION: The router time zone is GMT", text_color="red")
         important.grid(pady=10)
 
 
