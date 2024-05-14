@@ -524,7 +524,55 @@ class Settings(ctk.CTkFrame):
             print("Modal function not found for setting:", setting_name)
 
     def block_access_modal(self):
-        pass
+        modal = ctk.CTkToplevel(self.parent_window)
+        modal.configure(bg="#333333")
+        modal.title("Setting")
+
+        # Calculate the position relative to the parent window
+        parent_x = self.parent_window.winfo_rootx()
+        parent_y = self.parent_window.winfo_rooty()
+        parent_width = self.parent_window.winfo_width()
+        parent_height = self.parent_window.winfo_height()
+
+        modal_x = parent_x + parent_width // 2 - 150  # Center the modal horizontally
+        modal_y = parent_y + parent_height // 2 - 100  # Center the modal vertically
+        modal.geometry(f"+{modal_x}+{modal_y}")
+
+        # Make the modal window transient to the parent window
+        modal.transient(self.parent_window)
+        # Grab the focus to the modal window
+        modal.grab_set()
+
+        title = ctk.CTkLabel(modal, text = "Block access")
+        title.grid(pady = 5)
+
+        action = "deny"
+        action_label = ctk.CTkLabel(modal, text = f"Action: {action}")
+        action_label.grid(pady=10)
+
+        devices = db.session.query(device.device_name, device.MAC_address).all()
+        device_info = {name: mac for name, mac in devices}
+
+        def on_device_selected(event):
+                    global selected_mac_address, src_mac
+                    selected_device = device_dropdown.get()
+                    selected_mac_address = device_info.get(selected_device)
+                    
+                    if selected_mac_address:
+                        mac_label.configure(text=f"MAC Address: {selected_mac_address}")
+                        src_mac = selected_mac_address
+                        print("stored mac = ", src_mac)
+                    else:
+                        print("MAC address not found for device:", selected_device)
+        
+        device_dropdown = ttk.Combobox(modal, values=list(device_info.keys()), width = 30, state = "readonly")
+        device_dropdown.set("Select Device")
+        device_dropdown.grid(padx=10, pady=10)
+
+        mac_label = ctk.CTkLabel(modal, text="MAC Address: ")
+        mac_label.grid(padx=10, pady=10)
+
+        device_dropdown.bind("<<ComboboxSelected>>", on_device_selected)
 
     def time_restriction_modal(self):
         modal = ctk.CTkToplevel(self.parent_window)
@@ -549,25 +597,33 @@ class Settings(ctk.CTkFrame):
         title = ctk.CTkLabel(modal, text = "Time Restriction Setting")
         title.grid(pady = 5)
 
-        setting_name = "Filter-Parental-Controls"
-        # mac_addr = client_info['mac_address']
+        label = ctk.CTkLabel(modal, text = "Rule Name:")
+        label.grid(pady = 10)
 
+        setting_name = "Filter-Parental-Controls"
         settingname_entry = ctk.CTkEntry(modal, width = max(len(setting_name) * 7, 100))
         settingname_entry.insert(0, setting_name)
-        settingname_entry.grid(pady=10)
+        settingname_entry.grid(pady=0)
 
-        src = ctk.CTkLabel(modal, text = "Source zone: lan")
-        src.grid(pady=10)
+        src = "lan"
+        source = ctk.CTkLabel(modal, text = f"Source zone: {src}")
+        source.grid(pady=10)
 
         devices = db.session.query(device.device_name, device.MAC_address).all()
         device_info = {name: mac for name, mac in devices}
 
+        selected_mac_address = None
+        src_mac = None
 
         def on_device_selected(event):
+            global selected_mac_address, src_mac
             selected_device = device_dropdown.get()
             selected_mac_address = device_info.get(selected_device)
+            
             if selected_mac_address:
                 mac_label.configure(text=f"MAC Address: {selected_mac_address}")
+                src_mac = selected_mac_address
+                print("stored mac = ", src_mac)
             else:
                 print("MAC address not found for device:", selected_device)#
         
@@ -580,30 +636,28 @@ class Settings(ctk.CTkFrame):
 
         device_dropdown.bind("<<ComboboxSelected>>", on_device_selected)
 
+        dest = "wan"
+        destination = ctk.CTkLabel(modal, text = f"Destination zone: {dest}")
+        destination.grid(pady=10)
 
+        start_time = ctk.CTkEntry(modal, placeholder_text = "Start Time (hh:mm:ss)")
+        start_time.grid(pady = 12)
 
+        stop_time = ctk.CTkEntry(modal, placeholder_text = "Stop Time (hh:mm:ss)")
+        stop_time.grid(pady = 12)
 
+        weekdays_list = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        weekdays_dropdown = ctk.CTkOptionMenu(modal, values = weekdays_list)
+        weekdays_dropdown.set("Select restriction weekdays")
+        weekdays_dropdown.grid(pady=10)
 
+        target = "REJECT"
+        action = ctk.CTkLabel(modal, text = f"Action: {target}")
+        action.grid(pady=10)
 
-        # mac_label = ctk.CTkLabel(modal, text = f"MAC Address: {mac_addr}")
-        # mac_label.pack(pady = 5)
+        important = ctk.CTkLabel(modal, text = "Important: The router time zone is GMT", text_color="red")
+        important.grid(pady=10)
 
-        # device_types = ['Router', 'Extender', 'Mobile', 'Laptop', 'Computer', 'TV', 'Other']
-        # device_type_dropdown = ctk.CTkOptionMenu(modal, values = device_types)
-        # device_type_dropdown.pack(pady = 5)
-
-        # def add_device(devicename, mac_addr, devicetype):
-        #     device_name = devicename.get()
-        #     device_type = devicetype.get()
-
-        #     # Add device in database
-        #     device_ = device(device_name = device_name, MAC_address = mac_addr, device_type = device_type)
-        #     db.session.add(device_)
-        #     db.session.commit()
-        #     modal.destroy()
-
-        # add_button = ctk.CTkButton(modal, text="Add", command = lambda: add_device(devicename_entry, mac_addr, device_type_dropdown))
-        # add_button.pack(side="top", anchor="n", padx=5, pady=5)
 
     def create_menubar(self, parent):
         menubar = Menu(parent, bd=3, relief=RAISED)
