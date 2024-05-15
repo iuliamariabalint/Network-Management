@@ -503,7 +503,7 @@ class Settings(ctk.CTkFrame):
 
     def open_modal(self, parent, setting_name):
         modal_functions = {
-            "Block Network Access": self.block_access_modal,
+            "Manage Access to Wi-fi": self.manage_access_modal,
             "Network Usage Scheduler": self.time_restriction_modal,
         }
 
@@ -514,7 +514,7 @@ class Settings(ctk.CTkFrame):
         else:
             print("Modal function not found for setting:", setting_name)
 
-    def block_access_modal(self):
+    def manage_access_modal(self):
         modal = ctk.CTkToplevel(self.parent_window)
         modal.configure(bg="#333333")
         modal.title("Setting")
@@ -536,7 +536,7 @@ class Settings(ctk.CTkFrame):
 
         scrollable_frame = ctk.CTkScrollableFrame(modal)
         scrollable_frame.pack(fill='both', expand=True)
-        title = ctk.CTkLabel(scrollable_frame, text = "Block access")
+        title = ctk.CTkLabel(scrollable_frame, text = "Manage access to Wi-fi")
         title.grid(pady = 5)
 
         label = ctk.CTkLabel(scrollable_frame, text = "Select the desired action:")
