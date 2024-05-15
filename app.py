@@ -539,9 +539,12 @@ class Settings(ctk.CTkFrame):
         title = ctk.CTkLabel(scrollable_frame, text = "Block access")
         title.grid(pady = 5)
 
-        action = "deny"
-        action_label = ctk.CTkLabel(scrollable_frame, text = f"Action: {action}")
-        action_label.grid(pady=10)
+        label = ctk.CTkLabel(scrollable_frame, text = "Select the desired action:")
+        label.grid(pady=10)
+
+        actions = ["deny", "allow"]
+        action_option = ctk.CTkOptionMenu(scrollable_frame, values=actions)
+        action_option.grid(pady=0)
 
         devices = db.session.query(device.device_name, device.MAC_address).all()
         device_info = {name: mac for name, mac in devices}
@@ -565,6 +568,35 @@ class Settings(ctk.CTkFrame):
         mac_label.grid(padx=10, pady=10)
 
         device_dropdown.bind("<<ComboboxSelected>>", on_device_selected)
+
+        done_button = ctk.CTkButton(scrollable_frame, text = "Done", command = lambda: block_wifi_access(action_option,selected_mac_address))
+        done_button.grid(pady = 10)
+
+        def block_wifi_access(action, src_mac):
+            action = action_option.get()
+            print(action)
+            try:
+                with open('router_data.json') as data_file:
+                    router_data = json.load(data_file)
+
+                command = f"""uci set wireless.@wifi-iface[0].macfilter={action}
+                              uci add_list wireless.@wifi-iface[0].maclist={src_mac}
+                              uci show wireless.@wifi-iface[0]
+                              uci commit wireless
+                              wifi reload"""
+                
+                host = router_data['ip_address']
+                username = router_data['router_user']
+                password = router_data['router_password']
+                client = paramiko.SSHClient()
+                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                client.connect(hostname=host, username=username, password=password)
+                client.exec_command(command)
+                client.close()
+            except FileNotFoundError:
+                print("Fișierul JSON nu a fost găsit.")
+            modal.destroy()
+
 
     def time_restriction_modal(self):
         modal = ctk.CTkToplevel(self.parent_window)
