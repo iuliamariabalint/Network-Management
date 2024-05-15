@@ -662,35 +662,32 @@ class Settings(ctk.CTkFrame):
             days = weekdays_listbox.get()
             short_days = ' '.join([day[:3] for day in days])
 
-            print(name,src,mac,dest,start,stop,short_days,target)
-            
-            # print(f"the mac address is {mac}")
-            # try:
-            #     with open('router_data.json') as data_file:
-            #         router_data = json.load(data_file)
+            try:
+                with open('router_data.json') as data_file:
+                    router_data = json.load(data_file)
 
-            #     command = f"""uci add firewall rule
-            #                 uci set firewall.@rule[-1].name={name}
-            #                 uci set firewall.@rule[-1].src={src}
-            #                 uci set firewall.@rule[-1].src_mac={mac}
-            #                 uci set firewall.@rule[-1].dest={dest}
-            #                 uci set firewall.@rule[-1].start_time={start}
-            #                 uci set firewall.@rule[-1].stop_time={stop}
-            #                 uci set firewall.@rule[-1].weekdays={days}
-            #                 uci set firewall.@rule[-1].target={target}
-            #                 uci commit firewall
-            #                 service firewall restart"""
+                command = f"""uci add firewall rule
+                            uci set firewall.@rule[-1].name={name}
+                            uci set firewall.@rule[-1].src={src}
+                            uci set firewall.@rule[-1].src_mac={mac}
+                            uci set firewall.@rule[-1].dest={dest}
+                            uci set firewall.@rule[-1].start_time={start}
+                            uci set firewall.@rule[-1].stop_time={stop}
+                            uci set firewall.@rule[-1].weekdays={short_days}
+                            uci set firewall.@rule[-1].target={target}
+                            uci commit firewall
+                            service firewall restart"""
 
-            #     host = router_data['ip_address']
-            #     username = router_data['router_user']
-            #     password = router_data['router_password']
-            #     client = paramiko.SSHClient()
-            #     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            #     client.connect(hostname=host, username=username, password=password)
-            #     client.exec_command(command)
-            #     client.close()
-            # except FileNotFoundError:
-            #     print("Fișierul JSON nu a fost găsit.")
+                host = router_data['ip_address']
+                username = router_data['router_user']
+                password = router_data['router_password']
+                client = paramiko.SSHClient()
+                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                client.connect(hostname=host, username=username, password=password)
+                client.exec_command(command)
+                client.close()
+            except FileNotFoundError:
+                print("Fișierul JSON nu a fost găsit.")
             modal.destroy()
 
 
