@@ -474,6 +474,7 @@ class DeviceSettings(ctk.CTkFrame):
 from functools import partial
 from db_creation import settings
 from tkinter import ttk
+from CTkListbox import CTkListbox
 
 class Settings(ctk.CTkFrame):
     def __init__(self, parent, container):
@@ -544,14 +545,13 @@ class Settings(ctk.CTkFrame):
         device_info = {name: mac for name, mac in devices}
 
         def on_device_selected(event):
-                    global selected_mac_address, src_mac
+                    global selected_mac_address
                     selected_device = device_dropdown.get()
                     selected_mac_address = device_info.get(selected_device)
                     
                     if selected_mac_address:
                         mac_label.configure(text=f"MAC Address: {selected_mac_address}")
-                        src_mac = selected_mac_address
-                        print("stored mac = ", src_mac)
+
                     else:
                         print("MAC address not found for device:", selected_device)
         
@@ -568,6 +568,7 @@ class Settings(ctk.CTkFrame):
         modal = ctk.CTkToplevel(self.parent_window)
         modal.configure(bg="#333333")
         modal.title("Setting")
+        # modal.geometry("300x500")
 
         # Calculate the position relative to the parent window
         parent_x = self.parent_window.winfo_rootx()
@@ -602,18 +603,12 @@ class Settings(ctk.CTkFrame):
         devices = db.session.query(device.device_name, device.MAC_address).all()
         device_info = {name: mac for name, mac in devices}
 
-        selected_mac_address = None
-        src_mac = None
-
         def on_device_selected(event):
-            global selected_mac_address, src_mac
+            global selected_mac_address
             selected_device = device_dropdown.get()
             selected_mac_address = device_info.get(selected_device)
-            
             if selected_mac_address:
                 mac_label.configure(text=f"MAC Address: {selected_mac_address}")
-                src_mac = selected_mac_address
-                print("stored mac = ", src_mac)
             else:
                 print("MAC address not found for device:", selected_device)
         
@@ -636,20 +631,62 @@ class Settings(ctk.CTkFrame):
         stop_time = ctk.CTkEntry(modal, placeholder_text = "Stop Time (hh:mm:ss)")
         stop_time.grid(pady = 12)
 
-        weekdays_list = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-        weekdays_dropdown = ctk.CTkOptionMenu(modal, values = weekdays_list)
-        weekdays_dropdown.set("Select restriction weekdays")
-        weekdays_dropdown.grid(pady=10)
+        select_days_label = ctk.CTkLabel(modal, text = "Select the restriction days")
+        select_days_label.grid(padx= 5, pady= 12, sticky = W)
+
+        weekdays_dict = {1: "Monday", 2: "Tuesday", 3: "Wednesday", 4: "Thursday", 5: "Friday", 6: "Saturday", 7: "Sunday"}
+        weekdays_listbox = CTkListbox(modal, multiple_selection = True)
+        for key, value in weekdays_dict.items():
+            weekdays_listbox.insert(tk.END, value)
+        weekdays_listbox.grid(sticky=tk.NSEW)
 
         target = "REJECT"
         action = ctk.CTkLabel(modal, text = f"Action: {target}")
         action.grid(pady=10)
 
-        done_button = ctk.CTkButton(modal, text="done")
+        done_button = ctk.CTkButton(modal, text="done", command = lambda : time_restriction_setting(settingname_entry,src,selected_mac_address,dest,start_time,stop_time,weekdays_listbox,target))
         done_button.grid(padx=5, pady=5) 
 
         important = ctk.CTkLabel(modal, text = "ATENTION: The router time zone is GMT", text_color="red")
         important.grid(pady=10)
+
+        def time_restriction_setting(name,src,mac,dest,start,stop,days,target):
+            name = settingname_entry.get()
+            start = start_time.get()
+            stop = stop_time.get()
+            days = weekdays_listbox.get()
+            short_days = ' '.join([day[:3] for day in days])
+
+            print(name,src,mac,dest,start,stop,short_days,target)
+            
+            # print(f"the mac address is {mac}")
+            # try:
+            #     with open('router_data.json') as data_file:
+            #         router_data = json.load(data_file)
+
+            #     command = f"""uci add firewall rule
+            #                 uci set firewall.@rule[-1].name={name}
+            #                 uci set firewall.@rule[-1].src={src}
+            #                 uci set firewall.@rule[-1].src_mac={mac}
+            #                 uci set firewall.@rule[-1].dest={dest}
+            #                 uci set firewall.@rule[-1].start_time={start}
+            #                 uci set firewall.@rule[-1].stop_time={stop}
+            #                 uci set firewall.@rule[-1].weekdays={days}
+            #                 uci set firewall.@rule[-1].target={target}
+            #                 uci commit firewall
+            #                 service firewall restart"""
+
+            #     host = router_data['ip_address']
+            #     username = router_data['router_user']
+            #     password = router_data['router_password']
+            #     client = paramiko.SSHClient()
+            #     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            #     client.connect(hostname=host, username=username, password=password)
+            #     client.exec_command(command)
+            #     client.close()
+            # except FileNotFoundError:
+            #     print("Fișierul JSON nu a fost găsit.")
+            modal.destroy()
 
 
     def create_menubar(self, parent):
@@ -667,7 +704,7 @@ class Settings(ctk.CTkFrame):
         help_menu.add_command(label="Exit", command=parent.quit)
 
         return menubar
-
+    
 
 if __name__ == "__main__":
     with app.app_context():
