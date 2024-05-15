@@ -96,11 +96,19 @@ class LoginPage(ctk.CTkFrame):
             if user_data:
                 stored_password = user_data.password
                 if bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
+                    self.get_iduser(username)
                     parent.show_frame(parent.RouterDataPage)
                 else:
                     messagebox.showerror("Login Failed", "Incorrect password.")
             else:
                 messagebox.showerror("Login Failed", "Username not found.")
+
+    def get_iduser(self, username):
+        global id_connected_user
+        connected_user = db.session.query(user).filter_by(username=username).first()
+        id_connected_user = connected_user.iduser
+
+
 
     def create_menubar(self, parent):
         pass
@@ -475,7 +483,9 @@ from functools import partial
 from db_creation import settings
 from tkinter import ttk
 from CTkListbox import CTkListbox
-
+from db_creation import device_setting
+from datetime import datetime
+from sqlalchemy import text
 class Settings(ctk.CTkFrame):
     def __init__(self, parent, container):
         super().__init__(container)
@@ -502,6 +512,7 @@ class Settings(ctk.CTkFrame):
             label.grid(row=i+1, column=0, sticky=N, pady=45, padx=10)
 
     def open_modal(self, parent, setting_name):
+        self.get_idsetting(setting_name)
         modal_functions = {
             "Manage Access to Wi-fi": self.manage_access_modal,
             "Network Usage Scheduler": self.time_restriction_modal,
@@ -513,6 +524,12 @@ class Settings(ctk.CTkFrame):
             modal_function()
         else:
             print("Modal function not found for setting:", setting_name)
+    
+    def get_idsetting(self, setting_name):
+        global id_selected_setting
+        selected_setting = db.session.query(settings).filter(settings.setting_name == setting_name).first()
+        id_selected_setting = selected_setting.idsetting
+
 
     def manage_access_modal(self):
         modal = ctk.CTkToplevel(self.parent_window)
@@ -687,12 +704,21 @@ class Settings(ctk.CTkFrame):
         important = ctk.CTkLabel(scrollable_frame, text = "ATENTION: The router time zone is GMT", text_color="red")
         important.grid(pady=10, sticky = "N")
 
+
+
         def time_restriction_setting(name,src,mac,dest,start,stop,days,target):
             name = settingname_entry.get()
             start = start_time.get()
             stop = stop_time.get()
             days = weekdays_listbox.get()
             short_days = ' '.join([day[:3] for day in days])
+            setting_value = {"enabled": True,
+                             "affected days": short_days}
+            setting_time = datetime.now()
+            print(type(setting_time))
+            affected_device = db.session.query(device).filter(device.MAC_address == mac).first()
+            id_affected_device = affected_device.iddevice
+
 
             try:
                 with open('router_data.json') as data_file:
@@ -718,10 +744,17 @@ class Settings(ctk.CTkFrame):
                 client.connect(hostname=host, username=username, password=password)
                 client.exec_command(command)
                 client.close()
+
             except FileNotFoundError:
                 print("Fișierul JSON nu a fost găsit.")
+            self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start, stop)
             modal.destroy()
+            
 
+    def save_devicesetting(self, iduser, iddevice, idsetting, setting_value, setting_time, start_time, end_time):
+            new_device_setting = device_setting(iduser=iduser, iddevice=iddevice, idsetting=idsetting, setting_value=setting_value, setting_time=setting_time, start_time=start_time, end_time = end_time)
+            db.session.add(new_device_setting)
+            db.session.commit()
 
     def create_menubar(self, parent):
         menubar = Menu(parent, bd=3, relief=RAISED)
