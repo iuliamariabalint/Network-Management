@@ -525,8 +525,8 @@ class Settings(ctk.CTkFrame):
         parent_width = self.parent_window.winfo_width()
         parent_height = self.parent_window.winfo_height()
 
-        modal_x = parent_x + parent_width // 2 - 150  # Center the modal horizontally
-        modal_y = parent_y + parent_height // 2 - 100  # Center the modal vertically
+        modal_x = parent_x + parent_width // 2 + 380  # Position the modal horizontally
+        modal_y = parent_y + parent_height // 2 - 300  # Position the modal vertically
         modal.geometry(f"+{modal_x}+{modal_y}")
 
         # Make the modal window transient to the parent window
@@ -534,11 +534,13 @@ class Settings(ctk.CTkFrame):
         # Grab the focus to the modal window
         modal.grab_set()
 
-        title = ctk.CTkLabel(modal, text = "Block access")
+        scrollable_frame = ctk.CTkScrollableFrame(modal)
+        scrollable_frame.pack(fill='both', expand=True)
+        title = ctk.CTkLabel(scrollable_frame, text = "Block access")
         title.grid(pady = 5)
 
         action = "deny"
-        action_label = ctk.CTkLabel(modal, text = f"Action: {action}")
+        action_label = ctk.CTkLabel(scrollable_frame, text = f"Action: {action}")
         action_label.grid(pady=10)
 
         devices = db.session.query(device.device_name, device.MAC_address).all()
@@ -555,11 +557,11 @@ class Settings(ctk.CTkFrame):
                     else:
                         print("MAC address not found for device:", selected_device)
         
-        device_dropdown = ttk.Combobox(modal, values=list(device_info.keys()), width = 30, state = "readonly")
+        device_dropdown = ttk.Combobox(scrollable_frame, values=list(device_info.keys()), width = 30, state = "readonly")
         device_dropdown.set("Select Device")
         device_dropdown.grid(padx=10, pady=10)
 
-        mac_label = ctk.CTkLabel(modal, text="MAC Address: ")
+        mac_label = ctk.CTkLabel(scrollable_frame, text="MAC Address: ")
         mac_label.grid(padx=10, pady=10)
 
         device_dropdown.bind("<<ComboboxSelected>>", on_device_selected)
@@ -568,7 +570,7 @@ class Settings(ctk.CTkFrame):
         modal = ctk.CTkToplevel(self.parent_window)
         modal.configure(bg="#333333")
         modal.title("Setting")
-        # modal.geometry("300x500")
+        modal.geometry("250x500")
 
         # Calculate the position relative to the parent window
         parent_x = self.parent_window.winfo_rootx()
@@ -576,8 +578,8 @@ class Settings(ctk.CTkFrame):
         parent_width = self.parent_window.winfo_width()
         parent_height = self.parent_window.winfo_height()
 
-        modal_x = parent_x + parent_width // 2 - 150  # Center the modal horizontally
-        modal_y = parent_y + parent_height // 2 - 100  # Center the modal vertically
+        modal_x = parent_x + parent_width // 2 + 380  # Position the modal horizontally
+        modal_y = parent_y + parent_height // 2 - 300  # Position the modal vertically
         modal.geometry(f"+{modal_x}+{modal_y}")
 
         # Make the modal window transient to the parent window
@@ -585,20 +587,23 @@ class Settings(ctk.CTkFrame):
         # Grab the focus to the modal window
         modal.grab_set()
 
-        title = ctk.CTkLabel(modal, text = "Time Restriction Setting")
-        title.grid(pady = 5)
+        scrollable_frame = ctk.CTkScrollableFrame(modal)
+        scrollable_frame.pack(fill='both', expand=True)
 
-        label = ctk.CTkLabel(modal, text = "Rule Name:")
-        label.grid(pady = 10)
+        title = ctk.CTkLabel(scrollable_frame, text = "Time Restriction Setting")
+        title.grid(pady = 5, sticky = "N")
+
+        label = ctk.CTkLabel(scrollable_frame, text = "Rule Name:")
+        label.grid(padx = 5, pady = 10, sticky = "W")
 
         setting_name = "Filter-Parental-Controls"
-        settingname_entry = ctk.CTkEntry(modal, width = max(len(setting_name) * 7, 100))
+        settingname_entry = ctk.CTkEntry(scrollable_frame)
         settingname_entry.insert(0, setting_name)
-        settingname_entry.grid(pady=0)
+        settingname_entry.grid(padx = 5, sticky=NSEW)
 
         src = "lan"
-        source = ctk.CTkLabel(modal, text = f"Source zone: {src}")
-        source.grid(pady=10)
+        source = ctk.CTkLabel(scrollable_frame, text = f"Source zone: {src}")
+        source.grid(pady=5, sticky = "N")
 
         devices = db.session.query(device.device_name, device.MAC_address).all()
         device_info = {name: mac for name, mac in devices}
@@ -612,43 +617,43 @@ class Settings(ctk.CTkFrame):
             else:
                 print("MAC address not found for device:", selected_device)
         
-        device_dropdown = ttk.Combobox(modal, values=list(device_info.keys()), width = 30, state = "readonly")
+        device_dropdown = ttk.Combobox(scrollable_frame, values=list(device_info.keys()), width = 30, state = "readonly")
         device_dropdown.set("Select Device")
-        device_dropdown.grid(padx=10, pady=10)
+        device_dropdown.grid(padx=10, pady=10, sticky = "N")
 
-        mac_label = ctk.CTkLabel(modal, text="MAC Address: ")
-        mac_label.grid(padx=10, pady=10)
+        mac_label = ctk.CTkLabel(scrollable_frame, text="MAC Address: ")
+        mac_label.grid(padx=10, pady=10, sticky = "N")
 
         device_dropdown.bind("<<ComboboxSelected>>", on_device_selected)
 
         dest = "wan"
-        destination = ctk.CTkLabel(modal, text = f"Destination zone: {dest}")
-        destination.grid(pady=10)
+        destination = ctk.CTkLabel(scrollable_frame, text = f"Destination zone: {dest}")
+        destination.grid(pady=10, sticky = "N")
 
-        start_time = ctk.CTkEntry(modal, placeholder_text = "Start Time (hh:mm:ss)")
-        start_time.grid(pady = 12)
+        start_time = ctk.CTkEntry(scrollable_frame, placeholder_text = "Start Time (hh:mm:ss)")
+        start_time.grid(pady = 12, sticky = "N")
 
-        stop_time = ctk.CTkEntry(modal, placeholder_text = "Stop Time (hh:mm:ss)")
-        stop_time.grid(pady = 12)
+        stop_time = ctk.CTkEntry(scrollable_frame, placeholder_text = "Stop Time (hh:mm:ss)")
+        stop_time.grid(pady = 12, sticky = "N")
 
-        select_days_label = ctk.CTkLabel(modal, text = "Select the restriction days")
+        select_days_label = ctk.CTkLabel(scrollable_frame, text = "Select the restriction days")
         select_days_label.grid(padx= 5, pady= 12, sticky = W)
 
         weekdays_dict = {1: "Monday", 2: "Tuesday", 3: "Wednesday", 4: "Thursday", 5: "Friday", 6: "Saturday", 7: "Sunday"}
-        weekdays_listbox = CTkListbox(modal, multiple_selection = True)
+        weekdays_listbox = CTkListbox(scrollable_frame, multiple_selection = True)
         for key, value in weekdays_dict.items():
             weekdays_listbox.insert(tk.END, value)
         weekdays_listbox.grid(sticky=tk.NSEW)
 
         target = "REJECT"
-        action = ctk.CTkLabel(modal, text = f"Action: {target}")
-        action.grid(pady=10)
+        action = ctk.CTkLabel(scrollable_frame, text = f"Action: {target}")
+        action.grid(pady=10, sticky = "N")
 
-        done_button = ctk.CTkButton(modal, text="done", command = lambda : time_restriction_setting(settingname_entry,src,selected_mac_address,dest,start_time,stop_time,weekdays_listbox,target))
-        done_button.grid(padx=5, pady=5) 
+        done_button = ctk.CTkButton(scrollable_frame, text="done", command = lambda : time_restriction_setting(settingname_entry,src,selected_mac_address,dest,start_time,stop_time,weekdays_listbox,target))
+        done_button.grid(padx=5, pady=5, sticky = "N") 
 
-        important = ctk.CTkLabel(modal, text = "ATENTION: The router time zone is GMT", text_color="red")
-        important.grid(pady=10)
+        important = ctk.CTkLabel(scrollable_frame, text = "ATENTION: The router time zone is GMT", text_color="red")
+        important.grid(pady=10, sticky = "N")
 
         def time_restriction_setting(name,src,mac,dest,start,stop,days,target):
             name = settingname_entry.get()
