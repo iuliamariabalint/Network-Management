@@ -673,7 +673,7 @@ class Settings(ctk.CTkFrame):
                             uci set firewall.@rule[-1].dest={dest}
                             uci set firewall.@rule[-1].start_time={start}
                             uci set firewall.@rule[-1].stop_time={stop}
-                            uci set firewall.@rule[-1].weekdays={short_days}
+                            uci set firewall.@rule[-1].weekdays="{short_days}"
                             uci set firewall.@rule[-1].target={target}
                             uci commit firewall
                             service firewall restart"""
