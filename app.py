@@ -234,7 +234,7 @@ class HomePage(ctk.CTkFrame):
         self.columnconfigure(1, weight=1)
 
         label = ctk.CTkLabel(self, text="Home Page")
-        label.grid(row = 0, column = 0, sticky = E, pady = 20, padx = 10)
+        label.grid(row = 0, column = 0, columnspan = 2, sticky = N, pady = 20, padx = 10)
 
     def active_clients(self, parent):
         try:
@@ -381,7 +381,7 @@ class ManagedDevices(ctk.CTkFrame):
             widget.grid_remove()
         
         label = ctk.CTkLabel(self, text="Managed Devices")
-        label.grid(row = 0, sticky = E, pady = 20, padx = 10)
+        label.grid(column = 0, row = 0, columnspan = 2, sticky = N, pady = 20, padx = 10)
 
         devices = db.session.query(device.device_name, device.MAC_address, device.device_type).all()
         for i, dev in enumerate(devices):
@@ -420,43 +420,105 @@ class ManagedDevices(ctk.CTkFrame):
         return menubar
 
 #---------------------------------------------------DEVICE SETTINGS FRAME / CONTAINER --------------------------------------------------
+import re
 class DeviceSettings(ctk.CTkFrame):
     def __init__(self, parent, container, device_info = ("", "", ""), *args, **kwargs):
         super().__init__(container, *args, **kwargs)
-        back_button = ctk.CTkButton(self, text = "\u2190", command=lambda: parent.show_frame(ManagedDevices), text_color = "white", fg_color = "transparent", hover_color = "#544D4D")
-        back_button.pack(side="top", anchor="ne", padx=10, pady=10)
-        title = ctk.CTkLabel(self, text="Device Settings")
-        title.pack(pady = 5, padx = 10)
+        global scrollable_frame
+        scrollable_frame = ctk.CTkScrollableFrame(self)
+        scrollable_frame.pack(fill='both', expand=True)
+        scrollable_frame.columnconfigure(0, weight=1)
+        scrollable_frame.columnconfigure(1, weight=1)
+        back_button = ctk.CTkButton(scrollable_frame, text = "\u2190", command=lambda: parent.show_frame(ManagedDevices), text_color = "white", fg_color = "transparent", hover_color = "#544D4D")
+        back_button.grid(row = 0, column = 1, sticky = "ne", padx=10, pady=10)
+        title = ctk.CTkLabel(scrollable_frame, text="Device Settings")
+        title.grid(row = 1, column = 0, pady = 5, padx = 10, columnspan = 2, sticky = "n")
 
         self.parent = parent
         self.device_info = device_info
         self.show_device_settings()
 
+    def parse_firewall_config_for_mac(self, config_text, mac_address):
+        rules = []
+        current_rule = {}
+        for line in config_text.split('\n'):
+            if line.strip().startswith('config rule'):
+                if current_rule:
+                    if 'src_mac' in current_rule and current_rule['src_mac'] == mac_address:
+                        rules.append(current_rule)
+                    current_rule = {}
+            if line.strip().startswith('option'):
+                option_name, option_value = re.match(r'\s*option\s+(\S+)\s+\'?([^\'\s]+)\'?', line).groups()
+                current_rule[option_name] = option_value
+        if current_rule and 'src_mac' in current_rule and current_rule['src_mac'] == mac_address:
+            rules.append(current_rule)
+        return rules
+
+    def get_firewall_traffic_rules(self, mac):
+        try:
+            # global active_rules
+            with open('router_data.json') as data_file:
+                router_data = json.load(data_file)
+
+            command = "cat /etc/config/firewall"
+
+            host = router_data['ip_address']
+            username = router_data['router_user']
+            password = router_data['router_password']
+            client = paramiko.SSHClient()
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            client.connect(hostname=host, username=username, password=password)
+            stdin, stdout, stderr = client.exec_command(command)
+            firewall_rules = stdout.read().decode()
+            client.close()
+            active_rules = self.parse_firewall_config_for_mac(firewall_rules, mac)
+            with open("active_rules.json", "w") as file:
+                    json.dump(active_rules, file, indent = 4)
+            return active_rules
+        except FileNotFoundError:
+            print("The JSON file wasn't found")
+    
+        
     def show_device_settings(self):
+        # global mac_address
         # Extract the device name, MAC address, and device type from the device_info tuple
         device_name, mac_address, device_type = self.device_info
 
         # Create an entry for the device name
-        devicename_entry = ctk.CTkEntry(self, width = max(len(device_name) * 7, 100))
+        devicename_entry = ctk.CTkEntry(scrollable_frame, width = max(len(device_name) * 7, 150))
         devicename_entry.insert(0, device_name)
-        devicename_entry.pack(pady=10)
+        devicename_entry.grid(row = 2, column = 0, pady=10, columnspan = 2, sticky = "n")
 
         # Create a label for the MAC address
-        mac_label = ctk.CTkLabel(self, text=f"MAC Address: {mac_address}")
-        mac_label.pack(pady=5)
+        mac_label = ctk.CTkLabel(scrollable_frame, text=f"MAC Address: {mac_address}")
+        mac_label.grid(row = 3, column = 0, pady=5, columnspan = 2, sticky = "n")
 
         # Create a dropdown menu for selecting device type
-        device_type_var = ctk.StringVar(self)
+        device_type_var = ctk.StringVar(scrollable_frame)
         device_type_var.set(device_type)
         device_types = ['Router', 'Extender', 'Mobile', 'Laptop', 'Computer', 'TV', 'Other']
-        device_type_dropdown = ctk.CTkOptionMenu(self, variable=device_type_var, values=device_types)
-        device_type_dropdown.pack(pady=5)
+        device_type_dropdown = ctk.CTkOptionMenu(scrollable_frame, variable=device_type_var, values=device_types)
+        device_type_dropdown.grid(row = 4, column = 0, pady=5, columnspan = 2, sticky = "n")
 
-        delete_button = ctk.CTkButton(self, fg_color="transparent", hover_color="#F24A3B", text="delete", command = lambda: delete(mac_address, self.parent))
-        delete_button.pack(pady = 5)
+        delete_button = ctk.CTkButton(scrollable_frame, fg_color="transparent", hover_color="#F24A3B", text="delete", command = lambda: delete(mac_address, self.parent))
+        delete_button.grid(row = 5, column = 0, pady = 5, columnspan = 2, sticky = "n")
 
-        done_button = ctk.CTkButton(self, text="done", command = lambda: edit_device(self.parent, devicename_entry, mac_address, device_type_dropdown))
-        done_button.pack(side="top", anchor="n", padx=5, pady=5)
+        done_button = ctk.CTkButton(scrollable_frame, text="done", command = lambda: edit_device(self.parent, devicename_entry, mac_address, device_type_dropdown))
+        done_button.grid(row = 6, column = 0, padx=5, pady=5, columnspan = 2, sticky = "n")
+
+        title2 = ctk.CTkLabel(scrollable_frame, text = "ACTIVE RULES")
+        title2.grid(row = 7, column = 0, pady=15, columnspan = 2, sticky = "n")
+
+        active_rules = self.get_firewall_traffic_rules(mac_address)
+        try:
+            for i, rule in enumerate(active_rules):
+                rule_str = "\n".join([f"{key}: {value}" for key, value in rule.items()])
+                rule_label = ctk.CTkLabel(scrollable_frame, text=rule_str)
+                rule_label.grid(row=8+i, column=0, sticky = E, pady=15, padx=10)
+                button = ctk.CTkButton(scrollable_frame, text="edit rule")
+                button.grid(row=8+i, column=1, sticky = W, pady=5, padx=10)
+        except:
+            print("error")
 
         def delete(mac_addr, parent):
             existing_device = device.query.filter_by(MAC_address = mac_addr).first()
@@ -478,6 +540,8 @@ class DeviceSettings(ctk.CTkFrame):
             db.session.commit()
             parent.show_frame(ManagedDevices)
 
+    
+
 #---------------------------------------------------SETTINGS FRAME / CONTAINER --------------------------------------------------
 from functools import partial
 from db_creation import settings
@@ -485,7 +549,6 @@ from tkinter import ttk
 from CTkListbox import CTkListbox
 from db_creation import device_setting
 from datetime import datetime
-from sqlalchemy import text
 class Settings(ctk.CTkFrame):
     def __init__(self, parent, container):
         super().__init__(container)
