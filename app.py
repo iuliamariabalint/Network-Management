@@ -888,11 +888,10 @@ class Settings(ctk.CTkFrame):
             setting_time = datetime.now()
             affected_device = db.session.query(device).filter(device.MAC_address == src_mac).first()
             id_affected_device = affected_device.iddevice
-            if not websites:
+            if websites == [""]:
                 messagebox.showerror("Error", "Please enter at least one website to block.")
-                return 
-            try:
-                
+                return
+            try:               
                 with open('router_data.json') as data_file:
                     router_data = json.load(data_file)
                 
@@ -924,14 +923,14 @@ class Settings(ctk.CTkFrame):
 
                 self.execute_command(client, firewall_command)
                 client.close()
+                self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start_time = None, end_time = None)
                 modal.destroy()
             except FileNotFoundError:
                 print("Fișierul JSON nu a fost găsit.")
             except Exception as e:
                 messagebox.showerror("Error", f"An error occurred: {e}")
-            self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start_time = None, end_time = None)
-            modal.destroy()
 
+            
     def execute_command(self, client, command):
         stdin, stdout, stderr = client.exec_command(command)
         return stdout.read().decode()      
