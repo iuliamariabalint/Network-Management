@@ -579,6 +579,7 @@ class Settings(ctk.CTkFrame):
         modal_functions = {
             "Manage Access to Wi-fi": self.manage_access_modal,
             "Network Usage Scheduler": self.time_restriction_modal,
+            "Block Access to Website": self.block_website_modal,
         }
 
         modal_function = modal_functions.get(setting_name)
@@ -812,12 +813,124 @@ class Settings(ctk.CTkFrame):
                 print("Fișierul JSON nu a fost găsit.")
             self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start, stop)
             modal.destroy()
-            
+
+    def block_website_modal(self):
+        modal = ctk.CTkToplevel(self.parent_window)
+        modal.configure(bg="#333333")
+        modal.title("Setting")
+
+        # Calculate the position relative to the parent window
+        parent_x = self.parent_window.winfo_rootx()
+        parent_y = self.parent_window.winfo_rooty()
+        parent_width = self.parent_window.winfo_width()
+        parent_height = self.parent_window.winfo_height()
+
+        modal_x = parent_x + parent_width // 2 + 380  # Position the modal horizontally
+        modal_y = parent_y + parent_height // 2 - 300  # Position the modal vertically
+        modal.geometry(f"+{modal_x}+{modal_y}")
+
+        # Make the modal window transient to the parent window
+        modal.transient(self.parent_window)
+        # Grab the focus to the modal window
+        modal.grab_set()
+
+        title = ctk.CTkLabel(modal, text = "Block access to website")
+        title.grid(pady = 5)
+
+        label = ctk.CTkLabel(modal, text = "Rule Name:")
+        label.grid(padx = 5, pady = 10, sticky = "W")
+
+        setting_name = "Block websites"
+        settingname_entry = ctk.CTkEntry(modal)
+        settingname_entry.insert(0, setting_name)
+        settingname_entry.grid(padx = 5, sticky=NSEW)
+
+        label = ctk.CTkLabel(modal, text = "Enter websites to block (separated by comma):")
+        label.grid(pady=10)
+
+        websites_entry = ctk.CTkEntry(modal)
+        websites_entry.grid()
+
+        devices = db.session.query(device.device_name, device.MAC_address).all()
+        device_info = {name: mac for name, mac in devices}
+
+        def on_device_selected(event):
+            global selected_mac_address
+            selected_device = device_dropdown.get()
+            selected_mac_address = device_info.get(selected_device)
+            if selected_mac_address:
+                mac_label.configure(text=f"MAC Address: {selected_mac_address}")
+            else:
+                print("MAC address not found for device:", selected_device)
+        
+        device_dropdown = ttk.Combobox(modal, values=list(device_info.keys()), width = 30, state = "readonly")
+        device_dropdown.set("Select Device")
+        device_dropdown.grid(padx=10, pady=10)
+
+        mac_label = ctk.CTkLabel(modal, text="MAC Address: ")
+        mac_label.grid(padx=10, pady=10)
+
+        device_dropdown.bind("<<ComboboxSelected>>", on_device_selected)
+
+        done_button = ctk.CTkButton(modal, text = "Block", command = lambda: block_website_access(settingname_entry, selected_mac_address))
+        done_button.grid(pady = 10)
+
+        def block_website_access(rule_name, src_mac):
+            rule_name = settingname_entry.get()
+            websites = websites_entry.get().strip().split(",")
+            if not websites:
+                messagebox.showerror("Error", "Please enter at least one website to block.")
+                return 
+            try:
+                
+                with open('router_data.json') as data_file:
+                    router_data = json.load(data_file)
+                
+                # command = f"nslookup {website} | awk '/^Address: / {{ print $2 }}'"
+
+                host = router_data['ip_address']
+                username = router_data['router_user']
+                password = router_data['router_password']
+                client = paramiko.SSHClient()
+                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                client.connect(hostname=host, username=username, password=password)
+                addresses_list = []
+                for website in websites:
+                    ip_command = f"nslookup {website} | awk '/^Address: / {{ print $2 }}'"
+                    ip_address = self.execute_command(client, ip_command)
+                    first_ip_address = ip_address.split('\n')[0].strip()
+                    addresses_list.append(first_ip_address)
+                firewall_command = "uci add firewall rule\n"
+                firewall_command += f"uci set firewall.@rule[-1].name='{rule_name}'\n"
+                firewall_command += "uci set firewall.@rule[-1].src='lan'\n"
+                firewall_command += f"uci set firewall.@rule[-1].src_mac='{src_mac}'\n"
+                for ip in addresses_list:
+                    firewall_command += f"uci add_list firewall.@rule[-1].dest_ip='{ip}'\n"
+                firewall_command += "uci set firewall.@rule[-1].dest='wan'\n"
+                firewall_command += "uci set firewall.@rule[-1].proto='all'\n"
+                firewall_command += "uci set firewall.@rule[-1].target='REJECT'\n"
+                firewall_command += "uci commit firewall\n"
+                firewall_command += "/etc/init.d/firewall restart\n"
+
+                self.execute_command(client, firewall_command)
+                client.close()
+                modal.destroy()
+            except FileNotFoundError:
+                print("Fișierul JSON nu a fost găsit.")
+            except Exception as e:
+                messagebox.showerror("Error", f"An error occurred: {e}")
+            modal.destroy()
+
+    def execute_command(self, client, command):
+        stdin, stdout, stderr = client.exec_command(command)
+        return stdout.read().decode()      
 
     def save_devicesetting(self, iduser, iddevice, idsetting, setting_value, setting_time, start_time, end_time):
             new_device_setting = device_setting(iduser=iduser, iddevice=iddevice, idsetting=idsetting, setting_value=setting_value, setting_time=setting_time, start_time=start_time, end_time = end_time)
             db.session.add(new_device_setting)
             db.session.commit()
+
+
 
     def create_menubar(self, parent):
         menubar = Menu(parent, bd=3, relief=RAISED)
