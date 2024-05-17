@@ -655,7 +655,11 @@ class Settings(ctk.CTkFrame):
 
         def block_wifi_access(action, src_mac):
             action = action_option.get()
-            print(action)
+            setting_value = {"enabled": True,
+                             "action": action}
+            setting_time = datetime.now()
+            affected_device = db.session.query(device).filter(device.MAC_address == src_mac).first()
+            id_affected_device = affected_device.iddevice
             try:
                 with open('router_data.json') as data_file:
                     router_data = json.load(data_file)
@@ -676,6 +680,7 @@ class Settings(ctk.CTkFrame):
                 client.close()
             except FileNotFoundError:
                 print("Fișierul JSON nu a fost găsit.")
+            self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start_time = None, end_time = None)
             modal.destroy()
 
 
@@ -878,6 +883,11 @@ class Settings(ctk.CTkFrame):
         def block_website_access(rule_name, src_mac):
             rule_name = settingname_entry.get()
             websites = websites_entry.get().strip().split(",")
+            setting_value = {"enabled": True,
+                             "blocked websites": ", ".join(websites)}
+            setting_time = datetime.now()
+            affected_device = db.session.query(device).filter(device.MAC_address == src_mac).first()
+            id_affected_device = affected_device.iddevice
             if not websites:
                 messagebox.showerror("Error", "Please enter at least one website to block.")
                 return 
@@ -919,6 +929,7 @@ class Settings(ctk.CTkFrame):
                 print("Fișierul JSON nu a fost găsit.")
             except Exception as e:
                 messagebox.showerror("Error", f"An error occurred: {e}")
+            self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start_time = None, end_time = None)
             modal.destroy()
 
     def execute_command(self, client, command):
