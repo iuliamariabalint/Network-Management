@@ -998,11 +998,19 @@ class Settings(ctk.CTkFrame):
 
         device_dropdown.bind("<<ComboboxSelected>>", on_device_selected)
 
+        start_time = ctk.CTkEntry(scrollable_frame, placeholder_text = "Start Time (hh:mm:ss)")
+        start_time.grid(pady = 12, sticky = "N")
+
+        stop_time = ctk.CTkEntry(scrollable_frame, placeholder_text = "Stop Time (hh:mm:ss)")
+        stop_time.grid(pady = 12, sticky = "N")
+
         done_button = ctk.CTkButton(scrollable_frame, text = "Submit", command = lambda: allow_websites(selected_mac))
         done_button.grid(pady = 10)
 
         def allow_websites(selected_mac):
             rule_name = settingname_entry.get()
+            start = start_time.get()
+            stop = stop_time.get()
             websites = websites_entry.get().strip().split(",")
             setting_value = {"enabled": True,
                              "allowed websites": ", ".join(websites)}
@@ -1047,12 +1055,15 @@ class Settings(ctk.CTkFrame):
                 if selected_mac:
                     firewall_command += f"uci set firewall.@rule[-1].src_mac='{selected_mac}'\n"
                 firewall_command += "uci set firewall.@rule[-1].dest='wan'\n"
+                if start and stop :
+                    firewall_command += f"uci set firewall.@rule[-1].start_time={start}\n"
+                    firewall_command += f"uci set firewall.@rule[-1].stop_time={stop}\n"
                 firewall_command += "uci set firewall.@rule[-1].target='REJECT'\n"
                 firewall_command += "uci commit firewall\n"
                 firewall_command += "service firewall restart\n" 
                 self.execute_command(client, firewall_command)
                 client.close()
-                self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start_time = None, end_time = None)
+                self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start, stop)
                 modal.destroy()
             except FileNotFoundError:
                 print("Fișierul JSON nu a fost găsit.")
