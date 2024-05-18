@@ -580,6 +580,7 @@ class Settings(ctk.CTkFrame):
             "Manage Access to Wi-fi": self.manage_access_modal,
             "Network Usage Scheduler": self.time_restriction_modal,
             "Block Access to Website": self.block_website_modal,
+            "Block all access except for some websites": self.allow_only_some_websites
         }
 
         modal_function = modal_functions.get(setting_name)
@@ -919,8 +920,136 @@ class Settings(ctk.CTkFrame):
                 firewall_command += "uci set firewall.@rule[-1].proto='all'\n"
                 firewall_command += "uci set firewall.@rule[-1].target='REJECT'\n"
                 firewall_command += "uci commit firewall\n"
-                firewall_command += "/etc/init.d/firewall restart\n"
+                firewall_command += "service firewall restart\n"
 
+                self.execute_command(client, firewall_command)
+                client.close()
+                self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start_time = None, end_time = None)
+                modal.destroy()
+            except FileNotFoundError:
+                print("Fișierul JSON nu a fost găsit.")
+            except Exception as e:
+                messagebox.showerror("Error", f"An error occurred: {e}")
+
+    def allow_only_some_websites(self):
+        modal = ctk.CTkToplevel(self.parent_window)
+        modal.configure(bg="#333333")
+        modal.title("Setting")
+        modal.geometry("250x500")
+
+        # Calculate the position relative to the parent window
+        parent_x = self.parent_window.winfo_rootx()
+        parent_y = self.parent_window.winfo_rooty()
+        parent_width = self.parent_window.winfo_width()
+        parent_height = self.parent_window.winfo_height()
+
+        modal_x = parent_x + parent_width // 2 + 380  # Position the modal horizontally
+        modal_y = parent_y + parent_height // 2 - 300  # Position the modal vertically
+        modal.geometry(f"+{modal_x}+{modal_y}")
+
+        # Make the modal window transient to the parent window
+        modal.transient(self.parent_window)
+        # Grab the focus to the modal window
+        modal.grab_set()
+
+        scrollable_frame = ctk.CTkScrollableFrame(modal)
+        scrollable_frame.pack(fill='both', expand=True)
+
+        title = ctk.CTkLabel(scrollable_frame, text = "Block all internet access but to some websites")
+        title.grid(pady = 5)
+
+        label = ctk.CTkLabel(scrollable_frame, text = "Rule Name:")
+        label.grid(padx = 5, pady = 10, sticky = "W")
+
+        setting_name = "Allow only some websites"
+        settingname_entry = ctk.CTkEntry(scrollable_frame)
+        settingname_entry.insert(0, setting_name)
+        settingname_entry.grid(padx = 5, sticky=NSEW)
+
+        label = ctk.CTkLabel(scrollable_frame, text = "Please enter the allowed websites (separated by comma):")
+        label.grid(pady=10)
+
+        websites_entry = ctk.CTkEntry(scrollable_frame)
+        websites_entry.grid()
+
+        selected_mac = None
+
+        devices = db.session.query(device.device_name, device.MAC_address).all()
+        device_info = {name: mac for name, mac in devices}
+
+        def on_device_selected(event):
+            nonlocal selected_mac
+            selected_device = device_dropdown.get()
+            selected_mac = device_info.get(selected_device, "")
+            print("Selected MAC Address:", selected_mac)
+            if selected_mac:
+                mac_label.configure(text=f"MAC Address: {selected_mac}")
+            else:
+                print("MAC address not found for device:", selected_device)
+        
+        label = ctk.CTkLabel(scrollable_frame, text = "Select a device if the rule is intented for a specific device")
+        label.grid(pady=10)
+        device_dropdown = ttk.Combobox(scrollable_frame, values=list(device_info.keys()), width = 30, state = "readonly")
+        device_dropdown.set("Select")
+        device_dropdown.grid(padx=10, pady=0)
+
+        mac_label = ctk.CTkLabel(scrollable_frame, text="MAC Address: ")
+        mac_label.grid(padx=10, pady=10)
+
+        device_dropdown.bind("<<ComboboxSelected>>", on_device_selected)
+
+        done_button = ctk.CTkButton(scrollable_frame, text = "Submit", command = lambda: allow_websites(selected_mac))
+        done_button.grid(pady = 10)
+
+        def allow_websites(selected_mac):
+            rule_name = settingname_entry.get()
+            websites = websites_entry.get().strip().split(",")
+            setting_value = {"enabled": True,
+                             "allowed websites": ", ".join(websites)}
+            setting_time = datetime.now()
+            id_affected_device = None
+            if websites == [""]:
+                messagebox.showerror("Error", "Please enter at least one website to block.")
+                return
+            if selected_mac:
+                affected_device = db.session.query(device).filter(device.MAC_address == selected_mac).first()
+                id_affected_device = affected_device.iddevice
+            
+            try:               
+                with open('router_data.json') as data_file:
+                    router_data = json.load(data_file)
+
+                host = router_data['ip_address']
+                username = router_data['router_user']
+                password = router_data['router_password']
+                client = paramiko.SSHClient()
+                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                client.connect(hostname=host, username=username, password=password)
+                addresses_list = []
+                for website in websites:
+                    ip_command = f"nslookup {website} | awk '/^Address: / {{ print $2 }}'"
+                    ip_address = self.execute_command(client, ip_command)
+                    first_ip_address = ip_address.split('\n')[0].strip()
+                    addresses_list.append(first_ip_address)
+                firewall_command = "uci add firewall rule\n"
+                firewall_command += f"uci set firewall.@rule[-1].name='{rule_name}'\n"
+                firewall_command += "uci set firewall.@rule[-1].src='lan'\n"
+                if selected_mac:
+                    firewall_command += f"uci set firewall.@rule[-1].src_mac='{selected_mac}'\n"
+                firewall_command += "uci set firewall.@rule[-1].dest='wan'\n"
+                for ip in addresses_list:
+                    firewall_command += f"uci add_list firewall.@rule[-1].dest_ip='{ip}'\n"
+                firewall_command += "uci set firewall.@rule[-1].target='ACCEPT'\n"
+                firewall_command += "uci commit firewall\n"
+                firewall_command += "uci add firewall rule\n"
+                firewall_command += f"uci set firewall.@rule[-1].name='Block all access'\n"
+                firewall_command += "uci set firewall.@rule[-1].src='lan'\n"
+                if selected_mac:
+                    firewall_command += f"uci set firewall.@rule[-1].src_mac='{selected_mac}'\n"
+                firewall_command += "uci set firewall.@rule[-1].dest='wan'\n"
+                firewall_command += "uci set firewall.@rule[-1].target='REJECT'\n"
+                firewall_command += "uci commit firewall\n"
+                firewall_command += "service firewall restart\n" 
                 self.execute_command(client, firewall_command)
                 client.close()
                 self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start_time = None, end_time = None)
