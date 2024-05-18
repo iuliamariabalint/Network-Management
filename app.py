@@ -292,7 +292,7 @@ class HomePage(ctk.CTkFrame):
                     button.grid(row=i+1, column=1, sticky = W, pady=45, padx=10)
 
         except FileNotFoundError:
-            print("Fișierul JSON nu a fost găsit.")
+            print("The JSON file wasn't found")
         self.after(5000, self.active_clients, parent)
 
     def settings_modal(self, client_info):
@@ -421,6 +421,7 @@ class ManagedDevices(ctk.CTkFrame):
 
 #---------------------------------------------------DEVICE SETTINGS FRAME / CONTAINER --------------------------------------------------
 import re
+from collections import defaultdict
 class DeviceSettings(ctk.CTkFrame):
     def __init__(self, parent, container, device_info = ("", "", ""), *args, **kwargs):
         super().__init__(container, *args, **kwargs)
@@ -438,46 +439,45 @@ class DeviceSettings(ctk.CTkFrame):
         self.device_info = device_info
         self.show_device_settings()
 
-    def parse_firewall_config_for_mac(self, config_text, mac_address):
-        rules = []
-        current_rule = {}
-        for line in config_text.split('\n'):
-            if line.strip().startswith('config rule'):
-                if current_rule:
-                    if 'src_mac' in current_rule and current_rule['src_mac'] == mac_address:
-                        rules.append(current_rule)
-                    current_rule = {}
-            if line.strip().startswith('option'):
-                option_name, option_value = re.match(r'\s*option\s+(\S+)\s+\'?([^\'\s]+)\'?', line).groups()
-                current_rule[option_name] = option_value
-        if current_rule and 'src_mac' in current_rule and current_rule['src_mac'] == mac_address:
-            rules.append(current_rule)
-        return rules
-
-    def get_firewall_traffic_rules(self, mac):
-        try:
-            # global active_rules
+    def get_firewall_rules(self, mac):
+        try: 
             with open('router_data.json') as data_file:
-                router_data = json.load(data_file)
-
-            command = "cat /etc/config/firewall"
-
+               router_data = json.load(data_file)
             host = router_data['ip_address']
             username = router_data['router_user']
             password = router_data['router_password']
+
+            command = "uci show firewall"
+            
             client = paramiko.SSHClient()
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             client.connect(hostname=host, username=username, password=password)
             stdin, stdout, stderr = client.exec_command(command)
-            firewall_rules = stdout.read().decode()
+            output = stdout.read().decode()
             client.close()
-            active_rules = self.parse_firewall_config_for_mac(firewall_rules, mac)
-            with open("active_rules.json", "w") as file:
-                    json.dump(active_rules, file, indent = 4)
-            return active_rules
+            output = output.strip().split('\n')
+            rules = defaultdict(dict)
+            rule_components = re.compile(r'firewall\.@(\w+)\[(\d+)\]\.(\w+)=(.+)')
+            for line in output:
+                match = rule_components.match(line)
+                if match:
+                    rule_type, index, key, value = match.groups()
+                    full_key = f"{rule_type}_{index}"
+                    if 'rule' in full_key:
+                        rules[full_key][key] = value.strip("'")
+            
+            rule_list = []
+            for key, attributes in rules.items():
+                rule_type, index = key.split('_')
+                attributes['rule'] = int(index)
+                rule_list.append(attributes)
+
+            filtered_rules = [rule for rule in rule_list if rule.get('src_mac') == mac]
+            
+            return filtered_rules
         except FileNotFoundError:
             print("The JSON file wasn't found")
-    
+
         
     def show_device_settings(self):
         # global mac_address
@@ -509,7 +509,8 @@ class DeviceSettings(ctk.CTkFrame):
         title2 = ctk.CTkLabel(scrollable_frame, text = "ACTIVE RULES")
         title2.grid(row = 7, column = 0, pady=15, columnspan = 2, sticky = "n")
 
-        active_rules = self.get_firewall_traffic_rules(mac_address)
+        active_rules = self.get_firewall_rules(mac_address)
+
         try:
             for i, rule in enumerate(active_rules):
                 rule_str = "\n".join([f"{key}: {value}" for key, value in rule.items()])
@@ -518,7 +519,7 @@ class DeviceSettings(ctk.CTkFrame):
                 button = ctk.CTkButton(scrollable_frame, text="edit rule")
                 button.grid(row=8+i, column=1, sticky = W, pady=5, padx=10)
         except:
-            print("error")
+            print("first time loading")
 
         def delete(mac_addr, parent):
             existing_device = device.query.filter_by(MAC_address = mac_addr).first()
@@ -680,7 +681,7 @@ class Settings(ctk.CTkFrame):
                 client.exec_command(command)
                 client.close()
             except FileNotFoundError:
-                print("Fișierul JSON nu a fost găsit.")
+                print("The JSON file wasn't found")
             self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start_time = None, end_time = None)
             modal.destroy()
 
@@ -818,7 +819,7 @@ class Settings(ctk.CTkFrame):
                 client.close()
 
             except FileNotFoundError:
-                print("Fișierul JSON nu a fost găsit.")
+                print("The JSON file wasn't found")
             self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start, stop)
             modal.destroy()
 
@@ -929,7 +930,7 @@ class Settings(ctk.CTkFrame):
                 self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start_time = None, end_time = None)
                 modal.destroy()
             except FileNotFoundError:
-                print("Fișierul JSON nu a fost găsit.")
+                print("The JSON file wasn't found")
             except Exception as e:
                 messagebox.showerror("Error", f"An error occurred: {e}")
 
@@ -1072,7 +1073,7 @@ class Settings(ctk.CTkFrame):
                 self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start, stop)
                 modal.destroy()
             except FileNotFoundError:
-                print("Fișierul JSON nu a fost găsit.")
+                print("The JSON file wasn't found")
             except Exception as e:
                 messagebox.showerror("Error", f"An error occurred: {e}")
 
