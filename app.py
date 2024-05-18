@@ -458,6 +458,7 @@ class DeviceSettings(ctk.CTkFrame):
             output = output.strip().split('\n')
             rules = defaultdict(dict)
             rule_components = re.compile(r'firewall\.@(\w+)\[(\d+)\]\.(\w+)=(.+)')
+
             for line in output:
                 match = rule_components.match(line)
                 if match:
@@ -465,14 +466,19 @@ class DeviceSettings(ctk.CTkFrame):
                     full_key = f"{rule_type}_{index}"
                     if 'rule' in full_key:
                         rules[full_key][key] = value.strip("'")
-            
-            rule_list = []
+
+            rules_with_index = []
             for key, attributes in rules.items():
                 rule_type, index = key.split('_')
                 attributes['rule'] = int(index)
-                rule_list.append(attributes)
+                rules_with_index.append(attributes)
 
-            filtered_rules = [rule for rule in rule_list if rule.get('src_mac') == mac]
+            with open('active_rules.json', 'w') as f:
+                json.dump(rules_with_index, f, indent=4)
+
+            rules_without_index = [ {k: v for k, v in attributes.items() if k != 'rule'} for attributes in rules_with_index]
+
+            filtered_rules = [rule for rule in rules_without_index if rule.get('src_mac') == mac]
             
             return filtered_rules
         except FileNotFoundError:
