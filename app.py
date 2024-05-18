@@ -789,7 +789,9 @@ class Settings(ctk.CTkFrame):
             affected_device = db.session.query(device).filter(device.MAC_address == mac).first()
             id_affected_device = affected_device.iddevice
 
-
+            if len(start) != 8 or len(stop) != 8:
+                messagebox.showerror("Error", "Please enter the correct time format hh:mm:ss")
+                return
             try:
                 with open('router_data.json') as data_file:
                     router_data = json.load(data_file)
@@ -935,7 +937,7 @@ class Settings(ctk.CTkFrame):
         modal = ctk.CTkToplevel(self.parent_window)
         modal.configure(bg="#333333")
         modal.title("Setting")
-        modal.geometry("250x500")
+        modal.geometry("360x350")
 
         # Calculate the position relative to the parent window
         parent_x = self.parent_window.winfo_rootx()
@@ -967,10 +969,10 @@ class Settings(ctk.CTkFrame):
         settingname_entry.grid(padx = 5, sticky=NSEW)
 
         label = ctk.CTkLabel(scrollable_frame, text = "Please enter the allowed websites (separated by comma):")
-        label.grid(pady=10)
+        label.grid(padx = 5, pady=10)
 
         websites_entry = ctk.CTkEntry(scrollable_frame)
-        websites_entry.grid()
+        websites_entry.grid(sticky=NSEW)
 
         selected_mac = None
 
@@ -1016,8 +1018,12 @@ class Settings(ctk.CTkFrame):
                              "allowed websites": ", ".join(websites)}
             setting_time = datetime.now()
             id_affected_device = None
+            if start and stop:
+                if len(start) != 8 or len(stop) != 8:
+                    messagebox.showerror("Error", "Please enter the correct time format hh:mm:ss")
+                    return
             if websites == [""]:
-                messagebox.showerror("Error", "Please enter at least one website to block.")
+                messagebox.showerror("Error", "Please enter at least one website")
                 return
             if selected_mac:
                 affected_device = db.session.query(device).filter(device.MAC_address == selected_mac).first()
