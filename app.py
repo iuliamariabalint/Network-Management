@@ -425,6 +425,7 @@ from collections import defaultdict
 class DeviceSettings(ctk.CTkFrame):
     def __init__(self, parent, container, device_info = ("", "", ""), *args, **kwargs):
         super().__init__(container, *args, **kwargs)
+        self.parent_window = parent
         global scrollable_frame
         scrollable_frame = ctk.CTkScrollableFrame(self)
         scrollable_frame.pack(fill='both', expand=True)
@@ -476,9 +477,9 @@ class DeviceSettings(ctk.CTkFrame):
             with open('active_rules.json', 'w') as f:
                 json.dump(rules_with_index, f, indent=4)
 
-            rules_without_index = [ {k: v for k, v in attributes.items() if k != 'rule'} for attributes in rules_with_index]
+            # rules_without_index = [ {k: v for k, v in attributes.items() if k != 'rule'} for attributes in rules_with_index]
 
-            filtered_rules = [rule for rule in rules_without_index if rule.get('src_mac') == mac]
+            filtered_rules = [rule for rule in rules_with_index if rule.get('src_mac') == mac]
             
             return filtered_rules
         except FileNotFoundError:
@@ -516,13 +517,16 @@ class DeviceSettings(ctk.CTkFrame):
         title2.grid(row = 7, column = 0, pady=15, columnspan = 2, sticky = "n")
 
         active_rules = self.get_firewall_rules(mac_address)
+        
 
         try:
-            for i, rule in enumerate(active_rules):
+            rules_without_index = [ {k: v for k, v in attributes.items() if k != 'rule'} for attributes in active_rules]
+            for i, rule in enumerate(rules_without_index):
                 rule_str = "\n".join([f"{key}: {value}" for key, value in rule.items()])
                 rule_label = ctk.CTkLabel(scrollable_frame, text=rule_str)
                 rule_label.grid(row=8+i, column=0, sticky = E, pady=15, padx=10)
-                button = ctk.CTkButton(scrollable_frame, text="edit rule")
+            for i, rule in enumerate(active_rules):
+                button = ctk.CTkButton(scrollable_frame, text="edit rule", command = lambda rule = rule : self.edit_rules_modal(rule, mac_address))
                 button.grid(row=8+i, column=1, sticky = W, pady=5, padx=10)
         except:
             print("first time loading")
@@ -546,6 +550,124 @@ class DeviceSettings(ctk.CTkFrame):
             db.session.add(edited_device)
             db.session.commit()
             parent.show_frame(ManagedDevices)
+
+    def edit_rules_modal(self, rule, mac):
+        modal = ctk.CTkToplevel(self.parent_window)
+        modal.configure(bg="#333333")
+        modal.title("Setting")
+
+        # Calculate the position relative to the parent window
+        parent_x = self.parent_window.winfo_rootx()
+        parent_y = self.parent_window.winfo_rooty()
+        parent_width = self.parent_window.winfo_width()
+        parent_height = self.parent_window.winfo_height()
+
+        modal_x = parent_x + parent_width // 2 + 380  # Position the modal horizontally
+        modal_y = parent_y + parent_height // 2 - 300  # Position the modal vertically
+        modal.geometry(f"+{modal_x}+{modal_y}")
+
+        # Make the modal window transient to the parent window
+        modal.transient(self.parent_window)
+        # Grab the focus to the modal window
+        modal.grab_set()
+
+        scrollable_frame = ctk.CTkScrollableFrame(modal)
+        scrollable_frame.pack(fill='both', expand=True)
+
+        title = ctk.CTkLabel(scrollable_frame, text = "Edit Setting")
+        title.grid(column = 0, columnspan = 2, sticky = N ,pady = 5)
+
+        label = ctk.CTkLabel(scrollable_frame, text = "Rule Name:")
+        label.grid(column = 0, pady = 10, sticky = "W")
+
+        rule_name = rule["name"]
+        print(rule_name)
+        name_entry = ctk.CTkEntry(scrollable_frame)
+        name_entry.insert(0, rule_name)
+        name_entry.grid(column = 0, sticky="nsew")
+
+        mac_label = ctk.CTkLabel(scrollable_frame, text = f"Mac address: {mac}")
+        mac_label.grid(column = 0, pady = 10, sticky = "W")
+
+        ip_value = rule.get("dest_ip")
+        if ip_value:
+
+            ip_list = ip_value.split("' '")
+            try:               
+                with open('router_data.json') as data_file:
+                    router_data = json.load(data_file)
+                host = router_data['ip_address']
+                username = router_data['router_user']
+                password = router_data['router_password']
+                client = paramiko.SSHClient()
+                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                client.connect(hostname=host, username=username, password=password)
+                addresses_list = []
+                for ip in ip_list:
+                    ip_command = f"nslookup {ip} | awk '/name =/ {{ print $4 }}'"
+                    stdin, stdout, stderr = client.exec_command(ip_command)
+                    website = stdout.read().decode()
+                    addresses_list.append(website)
+                websites = ", ".join(addresses_list)
+                client.close()
+            except FileNotFoundError:
+                print("The JSON file wasn't found")
+            if rule["target"] == "REJECT":
+                label = ctk.CTkLabel(scrollable_frame, text = "Blocked websites:")
+                label.grid(column = 0, pady = 5, sticky = "W")
+            if rule["target"] == "ACCEPT":
+                label = ctk.CTkLabel(scrollable_frame, text = "Allowed websites:")
+                label.grid(column = 0, pady = 5, sticky = "W")
+            websites_entry = ctk.CTkEntry(scrollable_frame)
+            websites_entry.insert(0, websites)
+            websites_entry.grid(column = 0, sticky="nsew")
+        
+        start = rule.get("start_time")
+        stop = rule.get("stop_time")
+
+        if start and stop:
+            label_start = ctk.CTkLabel(scrollable_frame, text = "Start time: (hh:mm:ss)")
+            label_start.grid(column = 0, pady = 5, sticky = "W")
+            start_entry = ctk.CTkEntry(scrollable_frame)
+            start_entry.insert(0, start)
+            start_entry.grid(column = 0, sticky="nsew")
+            label_stop = ctk.CTkLabel(scrollable_frame, text = "Stop time: (hh:mm:ss)")
+            label_stop.grid(column = 0, pady = 5, sticky = "W")
+            stop_entry = ctk.CTkEntry(scrollable_frame)
+            stop_entry.insert(0, stop)
+            stop_entry.grid(column = 0, sticky="nsew")
+        
+        selected_days = rule.get("weekdays")
+        affected_days = StringVar(value=selected_days)
+        if selected_days:
+            days_label = ctk.CTkLabel(scrollable_frame, text="Restriction days")
+            days_label.grid(padx=5, pady=12, sticky=tk.W)
+
+            weekdays_dict = {1: "Mon", 2: "Tue", 3: "Wed", 4: "Thu", 5: "Fri", 6: "Sat", 7: "Sun"}
+            weekdays_listbox = CTkListbox(scrollable_frame, multiple_selection=True)
+            for key, value in weekdays_dict.items():
+                weekdays_listbox.insert(tk.END, value)
+            selected_days = affected_days.get().split(" ")
+            if isinstance(selected_days, list):
+                for day in selected_days:
+                    if day in weekdays_dict.values():
+                        index = list(weekdays_dict.values()).index(day)
+                        weekdays_listbox.activate(index)            
+            weekdays_listbox.grid(sticky=tk.NSEW)
+        
+        edit_button = ctk.CTkButton(scrollable_frame, text="edit", command = lambda rule = rule: self.edit_setting(rule))
+        edit_button.grid(pady = 10)
+
+        delete_button = ctk.CTkButton(scrollable_frame, fg_color="transparent", hover_color="#F24A3B", text="delete", command = lambda rule = rule: self.delete_setting(rule))
+        delete_button.grid(pady = 5)
+
+    def edit_setting(self, rule):
+        pass
+
+    def delete_setting(self, rule):
+        pass
+
+
 
     
 
@@ -919,6 +1041,7 @@ class Settings(ctk.CTkFrame):
                     ip_address = self.execute_command(client, ip_command)
                     first_ip_address = ip_address.split('\n')[0].strip()
                     addresses_list.append(first_ip_address)
+                print(addresses_list)
                 firewall_command = "uci add firewall rule\n"
                 firewall_command += f"uci set firewall.@rule[-1].name='{rule_name}'\n"
                 firewall_command += "uci set firewall.@rule[-1].src='lan'\n"
