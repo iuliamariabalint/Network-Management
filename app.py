@@ -438,7 +438,7 @@ class DeviceSettings(ctk.CTkFrame):
 
         self.parent = parent
         self.device_info = device_info
-        self.show_device_settings(parent)
+        self.show_device_settings()
 
     def get_firewall_rules(self, mac):
         try: 
@@ -485,7 +485,9 @@ class DeviceSettings(ctk.CTkFrame):
         except FileNotFoundError:
             print("The JSON file wasn't found")
 
-    def show_device_settings(self, parent):
+    def show_device_settings(self):
+        for widget in self.grid_slaves():
+            widget.grid_remove()
         # global mac_address
         # Extract the device name, MAC address, and device type from the device_info tuple
         device_name, mac_address, device_type = self.device_info
@@ -525,7 +527,7 @@ class DeviceSettings(ctk.CTkFrame):
                 rule_label = ctk.CTkLabel(scrollable_frame, text=rule_str)
                 rule_label.grid(row=8+i, column=0, sticky = E, pady=15, padx=10)
             for i, rule in enumerate(active_rules):
-                button = ctk.CTkButton(scrollable_frame, text="edit rule", command = lambda rule = rule : self.edit_rules_modal(rule, mac_address, parent))
+                button = ctk.CTkButton(scrollable_frame, text="edit rule", command = lambda rule = rule : self.edit_rules_modal(rule, mac_address))
                 button.grid(row=8+i, column=1, sticky = W, pady=5, padx=10)
         except:
             print("first time loading")
@@ -550,7 +552,7 @@ class DeviceSettings(ctk.CTkFrame):
             db.session.commit()
             parent.show_frame(ManagedDevices)
 
-    def edit_rules_modal(self, rule, mac, parent):
+    def edit_rules_modal(self, rule, mac):
         modal = ctk.CTkToplevel(self.parent_window)
         modal.configure(bg="#333333")
         modal.title("Setting")
@@ -590,8 +592,7 @@ class DeviceSettings(ctk.CTkFrame):
 
         ip_value = rule.get("dest_ip")
         if ip_value:
-
-            ip_list = ip_value.split("' '")
+            ip_list = ip_value.split(" ")
             try:               
                 with open('router_data.json') as data_file:
                     router_data = json.load(data_file)
@@ -636,9 +637,9 @@ class DeviceSettings(ctk.CTkFrame):
             stop_entry.insert(0, stop)
             stop_entry.grid(column = 0, sticky="nsew")
         
-        selected_days = rule.get("weekdays")
-        affected_days = StringVar(value=selected_days)
-        if selected_days:
+        days = rule.get("weekdays")
+        affected_days = StringVar(value=days)
+        if days:
             days_label = ctk.CTkLabel(scrollable_frame, text="Restriction days")
             days_label.grid(padx=5, pady=12, sticky=tk.W)
 
@@ -656,35 +657,91 @@ class DeviceSettings(ctk.CTkFrame):
         
         rule_number = rule["rule"]
         
-        edit_button = ctk.CTkButton(scrollable_frame, text="edit", command = lambda rule = rule: self.edit_setting(rule))
+        edit_button = ctk.CTkButton(scrollable_frame, text="edit", command = lambda : edit_setting())
         edit_button.grid(pady = 10)
 
-        delete_button = ctk.CTkButton(scrollable_frame, fg_color="transparent", hover_color="#F24A3B", text="delete", command = lambda : self.delete_setting(rule_number, modal, parent))
+        delete_button = ctk.CTkButton(scrollable_frame, fg_color="transparent", hover_color="#F24A3B", text="delete", command = lambda : delete_setting())
         delete_button.grid(pady = 5)
 
-    def edit_setting(self, rule):
-        pass
+        def edit_setting():
+            new_name = name_entry.get()
+            try:               
+                with open('router_data.json') as data_file:
+                    router_data = json.load(data_file)
+                host = router_data['ip_address']
+                username = router_data['router_user']
+                password = router_data['router_password']
+                client = paramiko.SSHClient()
+                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                client.connect(hostname=host, username=username, password=password)
+                if rule_name != new_name:
+                    change_name = f"uci set firewall.@rule[{rule_number}].name='{new_name}'"
+                    self.execute_command(client, change_name)
+                if start:
+                    new_start = start_entry.get()
+                    if start != new_start:
+                        change_start = f"uci set firewall.@rule[{rule_number}].start_time='{new_start}'"
+                        self.execute_command(client, change_start)
+                if stop:
+                    new_stop = stop_entry.get()
+                    if stop != new_stop:
+                        change_stop = f"uci set firewall.@rule[{rule_number}].stop_time='{new_stop}'"
+                        self.execute_command(client, change_stop)
+                if days:
+                    new_weekdays = weekdays_listbox.get()
+                    weekdays_str = " ".join(new_weekdays)
+                    if selected_days != new_weekdays:
+                        change_weekdays = f"uci set firewall.@rule[{rule_number}].weekdays='{weekdays_str}'"
+                        self.execute_command(client, change_weekdays)
+                if ip_value:
+                    new_websites = websites_entry.get().strip().split(",")
+                    new_websites = [ip.strip() for ip in new_websites]
+                    ip_list = ip_value.split(" ")
+                    print(ip_list)
+                    addresses_list = []
+                    for website in new_websites:
+                        ip_command = f"nslookup {website} | awk '/^Address: / {{ print $2 }}'"
+                        ip_address = self.execute_command(client, ip_command)
+                        first_ip_address = ip_address.split('\n')[0].strip()
+                        addresses_list.append(first_ip_address)
+                        addresses = " ".join(addresses_list)
+                    if ip_list != addresses_list:
+                        change_websites = f"uci set firewall.@rule[{rule_number}].dest_ip='{addresses}'\n"
+                        self.execute_command(client, change_websites)
+                    else:
+                        print("same websites as before")
+                final_command = """uci commit firewall
+                                   service firewall restart"""
+                self.execute_command(client, final_command)
+                client.close()
+                self.show_device_settings()
+                modal.destroy()
+            except FileNotFoundError:
+                print("The JSON file wasn't found")
 
-    def delete_setting(self, rule_number, modal, parent):
-        print(rule_number)
-        try:               
-            with open('router_data.json') as data_file:
-                router_data = json.load(data_file)
-            command = f"""uci delete firewall.@rule[{rule_number}]
-                        uci commit firewall
-                        service firewall restart"""
-            host = router_data['ip_address']
-            username = router_data['router_user']
-            password = router_data['router_password']
-            client = paramiko.SSHClient()
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            client.connect(hostname=host, username=username, password=password)
-            client.exec_command(command)
-            client.close()
-            modal.destroy()
-            parent.show_frame(DeviceSettings)
-        except FileNotFoundError:
-            print("The JSON file wasn't found")
+        def delete_setting():
+            try:               
+                with open('router_data.json') as data_file:
+                    router_data = json.load(data_file)
+                command = f"""uci delete firewall.@rule[{rule_number}]
+                            uci commit firewall
+                            service firewall restart"""
+                host = router_data['ip_address']
+                username = router_data['router_user']
+                password = router_data['router_password']
+                client = paramiko.SSHClient()
+                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                client.connect(hostname=host, username=username, password=password)
+                client.exec_command(command)
+                client.close()
+                self.show_device_settings()
+                modal.destroy()    
+            except FileNotFoundError:
+                print("The JSON file wasn't found")
+
+    def execute_command(self, client, command):
+        stdin, stdout, stderr = client.exec_command(command)
+        return stdout.read().decode() 
 
     def create_menubar(self, parent):
         menubar = Menu(parent, bd=3, relief=RAISED)
@@ -1073,13 +1130,13 @@ class Settings(ctk.CTkFrame):
                     ip_address = self.execute_command(client, ip_command)
                     first_ip_address = ip_address.split('\n')[0].strip()
                     addresses_list.append(first_ip_address)
-                print(addresses_list)
+                    addresses = " ".join(addresses_list)
+                print(addresses)
                 firewall_command = "uci add firewall rule\n"
                 firewall_command += f"uci set firewall.@rule[-1].name='{rule_name}'\n"
                 firewall_command += "uci set firewall.@rule[-1].src='lan'\n"
                 firewall_command += f"uci set firewall.@rule[-1].src_mac='{src_mac}'\n"
-                for ip in addresses_list:
-                    firewall_command += f"uci add_list firewall.@rule[-1].dest_ip='{ip}'\n"
+                firewall_command += f"uci set firewall.@rule[-1].dest_ip='{addresses}'\n"
                 firewall_command += "uci set firewall.@rule[-1].dest='wan'\n"
                 firewall_command += "uci set firewall.@rule[-1].proto='all'\n"
                 firewall_command += "uci set firewall.@rule[-1].target='REJECT'\n"
@@ -1207,14 +1264,14 @@ class Settings(ctk.CTkFrame):
                     ip_address = self.execute_command(client, ip_command)
                     first_ip_address = ip_address.split('\n')[0].strip()
                     addresses_list.append(first_ip_address)
+                    addresses = " ".join(addresses_list)
                 firewall_command = "uci add firewall rule\n"
                 firewall_command += f"uci set firewall.@rule[-1].name='{rule_name}'\n"
                 firewall_command += "uci set firewall.@rule[-1].src='lan'\n"
                 if selected_mac:
                     firewall_command += f"uci set firewall.@rule[-1].src_mac='{selected_mac}'\n"
                 firewall_command += "uci set firewall.@rule[-1].dest='wan'\n"
-                for ip in addresses_list:
-                    firewall_command += f"uci add_list firewall.@rule[-1].dest_ip='{ip}'\n"
+                firewall_command += f"uci set firewall.@rule[-1].dest_ip='{addresses}'\n"
                 firewall_command += "uci set firewall.@rule[-1].target='ACCEPT'\n"
                 firewall_command += "uci commit firewall\n"
                 firewall_command += "uci add firewall rule\n"
