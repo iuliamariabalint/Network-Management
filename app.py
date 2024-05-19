@@ -438,7 +438,7 @@ class DeviceSettings(ctk.CTkFrame):
 
         self.parent = parent
         self.device_info = device_info
-        self.show_device_settings()
+        self.show_device_settings(parent)
 
     def get_firewall_rules(self, mac):
         try: 
@@ -485,8 +485,7 @@ class DeviceSettings(ctk.CTkFrame):
         except FileNotFoundError:
             print("The JSON file wasn't found")
 
-        
-    def show_device_settings(self):
+    def show_device_settings(self, parent):
         # global mac_address
         # Extract the device name, MAC address, and device type from the device_info tuple
         device_name, mac_address, device_type = self.device_info
@@ -526,7 +525,7 @@ class DeviceSettings(ctk.CTkFrame):
                 rule_label = ctk.CTkLabel(scrollable_frame, text=rule_str)
                 rule_label.grid(row=8+i, column=0, sticky = E, pady=15, padx=10)
             for i, rule in enumerate(active_rules):
-                button = ctk.CTkButton(scrollable_frame, text="edit rule", command = lambda rule = rule : self.edit_rules_modal(rule, mac_address))
+                button = ctk.CTkButton(scrollable_frame, text="edit rule", command = lambda rule = rule : self.edit_rules_modal(rule, mac_address, parent))
                 button.grid(row=8+i, column=1, sticky = W, pady=5, padx=10)
         except:
             print("first time loading")
@@ -551,7 +550,7 @@ class DeviceSettings(ctk.CTkFrame):
             db.session.commit()
             parent.show_frame(ManagedDevices)
 
-    def edit_rules_modal(self, rule, mac):
+    def edit_rules_modal(self, rule, mac, parent):
         modal = ctk.CTkToplevel(self.parent_window)
         modal.configure(bg="#333333")
         modal.title("Setting")
@@ -655,21 +654,54 @@ class DeviceSettings(ctk.CTkFrame):
                         weekdays_listbox.activate(index)            
             weekdays_listbox.grid(sticky=tk.NSEW)
         
+        rule_number = rule["rule"]
+        
         edit_button = ctk.CTkButton(scrollable_frame, text="edit", command = lambda rule = rule: self.edit_setting(rule))
         edit_button.grid(pady = 10)
 
-        delete_button = ctk.CTkButton(scrollable_frame, fg_color="transparent", hover_color="#F24A3B", text="delete", command = lambda rule = rule: self.delete_setting(rule))
+        delete_button = ctk.CTkButton(scrollable_frame, fg_color="transparent", hover_color="#F24A3B", text="delete", command = lambda : self.delete_setting(rule_number, modal, parent))
         delete_button.grid(pady = 5)
 
     def edit_setting(self, rule):
         pass
 
-    def delete_setting(self, rule):
-        pass
+    def delete_setting(self, rule_number, modal, parent):
+        print(rule_number)
+        try:               
+            with open('router_data.json') as data_file:
+                router_data = json.load(data_file)
+            command = f"""uci delete firewall.@rule[{rule_number}]
+                        uci commit firewall
+                        service firewall restart"""
+            host = router_data['ip_address']
+            username = router_data['router_user']
+            password = router_data['router_password']
+            client = paramiko.SSHClient()
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            client.connect(hostname=host, username=username, password=password)
+            client.exec_command(command)
+            client.close()
+            modal.destroy()
+            parent.show_frame(DeviceSettings)
+        except FileNotFoundError:
+            print("The JSON file wasn't found")
 
+    def create_menubar(self, parent):
+        menubar = Menu(parent, bd=3, relief=RAISED)
 
+        filemenu = Menu(menubar, tearoff=0, relief=RAISED)
+        menubar.add_cascade(label="Devices", menu=filemenu)
+        filemenu.add_command(label="Connected devices", command=lambda: parent.show_frame(parent.HomePage))
+        filemenu.add_command(label="Settings", command=lambda: parent.show_frame(parent.Settings))
+ 
+        ## help menu
+        help_menu = Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Help", menu=help_menu)
+        help_menu.add_command(label="About")
+        help_menu.add_separator()
+        help_menu.add_command(label="Exit", command=parent.quit) 
 
-    
+        return menubar
 
 #---------------------------------------------------SETTINGS FRAME / CONTAINER --------------------------------------------------
 from functools import partial
