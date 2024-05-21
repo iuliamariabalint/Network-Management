@@ -52,9 +52,9 @@ class device_setting(db.Model):
     __tablename__ = 'device_setting'
 
     iddevice_setting = db.Column(db.Integer, primary_key = True, autoincrement = True)
-    iduser = db.Column(db.ForeignKey('user.iduser'))
+    iduser = db.Column(db.ForeignKey('user.iduser'), nullable = False)
     iddevice = db.Column(db.ForeignKey('device.iddevice'))
-    idsetting = db.Column(db.ForeignKey('settings.idsetting'))
+    idsetting = db.Column(db.ForeignKey('settings.idsetting'), nullable = False)
     setting_value = db.Column(db.JSON)
     setting_time = db.Column(db.DateTime, nullable = False)
     start_time = db.Column(db.VARCHAR(8))
