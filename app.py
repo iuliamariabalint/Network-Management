@@ -350,13 +350,16 @@ class HomePage(ctk.CTkFrame):
     def create_menubar(self, parent):
         menubar = Menu(parent, bd=3, relief=RAISED)
 
-        filemenu = Menu(menubar, tearoff=0, relief=RAISED)
-        menubar.add_cascade(label="Devices", menu=filemenu)
-        filemenu.add_command(label="Managed devices", command=lambda: parent.show_frame(parent.ManagedDevices))
-        filemenu.add_command(label="Settings", command=lambda: parent.show_frame(parent.Settings))
-        filemenu.add_command(label="General rules", command=lambda: parent.show_frame(parent.GeneralRules)) 
+        devicemenu = Menu(menubar, tearoff=0, relief=RAISED)
+        menubar.add_cascade(label="Devices", menu=devicemenu)
+        devicemenu.add_command(label="Managed devices", command=lambda: parent.show_frame(parent.ManagedDevices))
 
-        ## help menu
+        setttingsmenu = Menu(menubar, tearoff=0, relief=RAISED)
+        menubar.add_cascade(label="Settings", menu=setttingsmenu)
+        setttingsmenu.add_command(label="New", command=lambda: parent.show_frame(parent.Settings)) 
+        setttingsmenu.add_command(label="General rules", command=lambda: parent.show_frame(parent.GeneralRules)) 
+        setttingsmenu.add_command(label="Usual rules", command=lambda: parent.show_frame(parent.GeneralRules)) 
+
         help_menu = Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Help", menu=help_menu)
         help_menu.add_command(label="About")
@@ -405,10 +408,15 @@ class ManagedDevices(ctk.CTkFrame):
     def create_menubar(self, parent):
         menubar = Menu(parent, bd=3, relief=RAISED)
 
-        filemenu = Menu(menubar, tearoff=0, relief=RAISED)
-        menubar.add_cascade(label="Devices", menu=filemenu)
-        filemenu.add_command(label="Connected devices", command=lambda: parent.show_frame(parent.HomePage))
-        filemenu.add_command(label="Settings", command=lambda: parent.show_frame(parent.Settings))
+        devicemenu = Menu(menubar, tearoff=0, relief=RAISED)
+        menubar.add_cascade(label="Devices", menu=devicemenu)
+        devicemenu.add_command(label="Connected devices", command=lambda: parent.show_frame(parent.HomePage))
+
+        setttingsmenu = Menu(menubar, tearoff=0, relief=RAISED)
+        menubar.add_cascade(label="Settings", menu=setttingsmenu)
+        setttingsmenu.add_command(label="New", command=lambda: parent.show_frame(parent.Settings)) 
+        setttingsmenu.add_command(label="General rules", command=lambda: parent.show_frame(parent.GeneralRules)) 
+        setttingsmenu.add_command(label="Usual rules", command=lambda: parent.show_frame(parent.GeneralRules)) 
  
         ## help menu
         help_menu = Menu(menubar, tearoff=0)
@@ -462,7 +470,7 @@ def get_firewall_rules(mac=None):
 
             for rule in rules_with_index:
                 if mac is None:
-                    if 'src_mac' and 'proto' not in rule:
+                    if 'src_mac' not in rule and rule["rule"] > 8 :
                         filtered_rules.append(rule)
                 else:
                     if rule.get('src_mac') == mac:
@@ -757,8 +765,6 @@ class DeviceSettings(ctk.CTkFrame):
                 client.connect(hostname=host, username=username, password=password)
                 client.exec_command(command)
                 client.close()
-                
-
                 modal.destroy()    
                 self.show_device_settings()
             except FileNotFoundError:
@@ -771,10 +777,15 @@ class DeviceSettings(ctk.CTkFrame):
     def create_menubar(self, parent):
         menubar = Menu(parent, bd=3, relief=RAISED)
 
-        filemenu = Menu(menubar, tearoff=0, relief=RAISED)
-        menubar.add_cascade(label="Devices", menu=filemenu)
-        filemenu.add_command(label="Connected devices", command=lambda: parent.show_frame(parent.HomePage))
-        filemenu.add_command(label="Settings", command=lambda: parent.show_frame(parent.Settings))
+        devicemenu = Menu(menubar, tearoff=0, relief=RAISED)
+        menubar.add_cascade(label="Devices", menu=devicemenu)
+        devicemenu.add_command(label="Connected devices", command=lambda: parent.show_frame(parent.HomePage))
+
+        setttingsmenu = Menu(menubar, tearoff=0, relief=RAISED)
+        menubar.add_cascade(label="Settings", menu=setttingsmenu)
+        setttingsmenu.add_command(label="New", command=lambda: parent.show_frame(parent.Settings)) 
+        setttingsmenu.add_command(label="General rules", command=lambda: parent.show_frame(parent.GeneralRules)) 
+        setttingsmenu.add_command(label="Usual rules", command=lambda: parent.show_frame(parent.GeneralRules)) 
  
         ## help menu
         help_menu = Menu(menubar, tearoff=0)
@@ -1350,14 +1361,18 @@ class Settings(ctk.CTkFrame):
             return setting_id
 
 
-
     def create_menubar(self, parent):
         menubar = Menu(parent, bd=3, relief=RAISED)
 
-        filemenu = Menu(menubar, tearoff=0, relief=RAISED)
-        menubar.add_cascade(label="Devices", menu=filemenu)
-        filemenu.add_command(label="Connected devices", command=lambda: parent.show_frame(parent.HomePage))
-        filemenu.add_command(label="Managed devices", command=lambda: parent.show_frame(parent.ManagedDevices))
+        devicemenu = Menu(menubar, tearoff=0, relief=RAISED)
+        menubar.add_cascade(label="Devices", menu=devicemenu)
+        devicemenu.add_command(label="Connected devices", command=lambda: parent.show_frame(parent.HomePage))
+        devicemenu.add_command(label="Managed devices", command=lambda: parent.show_frame(parent.ManagedDevices))
+
+        setttingsmenu = Menu(menubar, tearoff=0, relief=RAISED)
+        menubar.add_cascade(label="Settings", menu=setttingsmenu)
+        setttingsmenu.add_command(label="General rules", command=lambda: parent.show_frame(parent.GeneralRules)) 
+        setttingsmenu.add_command(label="Usual rules", command=lambda: parent.show_frame(parent.GeneralRules)) 
   
         help_menu = Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Help", menu=help_menu)
@@ -1386,6 +1401,7 @@ class GeneralRules(ctk.CTkFrame):
         label = ctk.CTkLabel(scrollable_general_rules, text="Rules Applied to All Connected Devices")
         label.grid(row = 0, column = 0, sticky = N, pady = 20, padx = 10, columnspan = 2)
         general_rules = get_firewall_rules()
+        print("general rules,", general_rules)
         try:
             rules_without_index = [ {k: v for k, v in attributes.items() if (k != 'rule')} for attributes in general_rules]
             for i, rule in enumerate(rules_without_index): 
@@ -1403,11 +1419,16 @@ class GeneralRules(ctk.CTkFrame):
     def create_menubar(self, parent):
         menubar = Menu(parent, bd=3, relief=RAISED)
 
-        filemenu = Menu(menubar, tearoff=0, relief=RAISED)
-        menubar.add_cascade(label="Devices", menu=filemenu)
-        filemenu.add_command(label="Connected devices", command=lambda: parent.show_frame(parent.HomePage))
-        filemenu.add_command(label="Managed devices", command=lambda: parent.show_frame(parent.ManagedDevices))
-  
+        devicemenu = Menu(menubar, tearoff=0, relief=RAISED)
+        menubar.add_cascade(label="Devices", menu=devicemenu)
+        devicemenu.add_command(label="Connected devices", command=lambda: parent.show_frame(parent.HomePage))
+        devicemenu.add_command(label="Managed devices", command=lambda: parent.show_frame(parent.ManagedDevices))
+
+        setttingsmenu = Menu(menubar, tearoff=0, relief=RAISED)
+        menubar.add_cascade(label="Settings", menu=setttingsmenu)
+        setttingsmenu.add_command(label="New", command=lambda: parent.show_frame(parent.Settings))
+        setttingsmenu.add_command(label="Usual rules", command=lambda: parent.show_frame(parent.GeneralRules)) 
+
         help_menu = Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Help", menu=help_menu)
         help_menu.add_command(label="About")
