@@ -42,9 +42,10 @@ class App(ctk.CTk):
         self.ManagedDevices = ManagedDevices
         self.DeviceSettings = DeviceSettings
         self.Settings = Settings
+        self.GeneralRules = GeneralRules
 
         ## Defining Frames and Packing it
-        for F in {LoginPage, SignupPage, RouterDataPage, HomePage, ManagedDevices, Settings, DeviceSettings}:
+        for F in {LoginPage, SignupPage, RouterDataPage, HomePage, ManagedDevices, Settings, DeviceSettings, GeneralRules}:
             frame = F(self, container)
             self.frames[F] = frame
             frame.grid(row=0, column=0, sticky = "nsew")    
@@ -82,9 +83,6 @@ class LoginPage(ctk.CTkFrame):
 
         button = ctk.CTkButton(self, text = "Login", command = lambda: login(username_entry, password_entry))
         button.pack(pady = 12, padx = 10)
-
-        checkbox = ctk.CTkCheckBox(self, text = "Remember me")
-        checkbox.pack(pady = 12, padx = 10)
 
         signup_button = ctk.CTkButton(self, text = "Sign up", cursor = 'hand2', command = lambda: parent.show_frame(parent.SignupPage))
         signup_button.pack(pady = 1, padx = 10)
@@ -191,6 +189,7 @@ class RouterDataPage(ctk.CTkFrame):
         def save_router_data(user, password):
         # Hash the password
         #hashed_password = hash_password(password_entry.get())
+            global credentials_saved
             user = user_entry
             password = password_entry
             data = {
@@ -354,7 +353,8 @@ class HomePage(ctk.CTkFrame):
         filemenu = Menu(menubar, tearoff=0, relief=RAISED)
         menubar.add_cascade(label="Devices", menu=filemenu)
         filemenu.add_command(label="Managed devices", command=lambda: parent.show_frame(parent.ManagedDevices))
-        filemenu.add_command(label="Settings", command=lambda: parent.show_frame(parent.Settings)) 
+        filemenu.add_command(label="Settings", command=lambda: parent.show_frame(parent.Settings))
+        filemenu.add_command(label="General rules", command=lambda: parent.show_frame(parent.GeneralRules)) 
 
         ## help menu
         help_menu = Menu(menubar, tearoff=0)
@@ -394,7 +394,7 @@ class ManagedDevices(ctk.CTkFrame):
             edit_button.grid(row=i+1, column=1, sticky = NW, pady=55, padx=10)
 
 
-        self.after(3000, self.get_and_show_devices, parent)
+        self.after(5000, self.get_and_show_devices, parent)
 
     def edit_device(self, dev):
         parent_container = self.master
@@ -420,21 +420,7 @@ class ManagedDevices(ctk.CTkFrame):
         return menubar
 
 #---------------------------------------------------DEVICE SETTINGS FRAME / CONTAINER --------------------------------------------------
-import re
-from collections import defaultdict
-class DeviceSettings(ctk.CTkFrame):
-    def __init__(self, parent, container, device_info = ("", "", ""), *args, **kwargs):
-        super().__init__(container, *args, **kwargs)
-        global scrollable_frame
-        scrollable_frame = ctk.CTkScrollableFrame(self)
-        scrollable_frame.pack(fill='both', expand=True)
-        scrollable_frame.columnconfigure(0, weight=1)
-        scrollable_frame.columnconfigure(1, weight=1)
-        self.parent = parent
-        self.device_info = device_info
-        self.show_device_settings()
-
-    def get_firewall_rules(self, mac):
+def get_firewall_rules(mac=None):
         try: 
             with open('router_data.json') as data_file:
                router_data = json.load(data_file)
@@ -472,12 +458,34 @@ class DeviceSettings(ctk.CTkFrame):
                 json.dump(rules_with_index, f, indent=4)
 
             # rules_without_index = [ {k: v for k, v in attributes.items() if k != 'rule'} for attributes in rules_with_index]
+            filtered_rules = []
 
-            filtered_rules = [rule for rule in rules_with_index if rule.get('src_mac') == mac]
-            
+            for rule in rules_with_index:
+                if mac is None:
+                    if 'src_mac' and 'icmp_type' not in rule:
+                        filtered_rules.append(rule)
+                else:
+                    if rule.get('src_mac') == mac:
+                        filtered_rules.append(rule)
             return filtered_rules
         except FileNotFoundError:
             print("The JSON file wasn't found")
+
+import re
+from collections import defaultdict
+class DeviceSettings(ctk.CTkFrame):
+    def __init__(self, parent, container, device_info = ("", "", ""), *args, **kwargs):
+        super().__init__(container, *args, **kwargs)
+        global scrollable_frame
+        scrollable_frame = ctk.CTkScrollableFrame(self)
+        scrollable_frame.pack(fill='both', expand=True)
+        scrollable_frame.columnconfigure(0, weight=1)
+        scrollable_frame.columnconfigure(1, weight=1)
+        self.parent = parent
+        self.device_info = device_info
+        self.show_device_settings()
+
+    
 
     def show_device_settings(self):
         
@@ -517,9 +525,8 @@ class DeviceSettings(ctk.CTkFrame):
         title2 = ctk.CTkLabel(scrollable_frame, text = "ACTIVE RULES")
         title2.grid(row = 7, column = 0, pady=15, columnspan = 2, sticky = "n")
 
-        active_rules = self.get_firewall_rules(mac_address)
-        
-
+        active_rules = get_firewall_rules(mac_address)
+    
         try:
             rules_without_index = [ {k: v for k, v in attributes.items() if k != 'rule'} for attributes in active_rules]
             for i, rule in enumerate(rules_without_index):
@@ -544,12 +551,9 @@ class DeviceSettings(ctk.CTkFrame):
             device_type = devicetype.get()
             existing_device = device.query.filter_by(MAC_address = mac_addr).first()
             if existing_device:
-                db.session.delete(existing_device)
+                existing_device.device_name = device_name
+                existing_device.device_type = device_type
                 db.session.commit()
-            # Add device in database
-            edited_device = device(device_name = device_name, MAC_address = mac_addr, device_type = device_type)
-            db.session.add(edited_device)
-            db.session.commit()
             parent.show_frame(ManagedDevices)
 
     def edit_rules_modal(self, rule, mac):
@@ -746,6 +750,8 @@ class DeviceSettings(ctk.CTkFrame):
                 client.connect(hostname=host, username=username, password=password)
                 client.exec_command(command)
                 client.close()
+                
+
                 modal.destroy()    
                 self.show_device_settings()
             except FileNotFoundError:
@@ -1344,8 +1350,57 @@ class Settings(ctk.CTkFrame):
         help_menu.add_command(label="Exit", command=parent.quit)
 
         return menubar
-    
 
+class GeneralRules(ctk.CTkFrame):
+    def __init__(self, parent, container):
+        super().__init__(container)
+        self.parent_window = parent
+        global scrollable_general_rules
+        scrollable_general_rules = ctk.CTkScrollableFrame(self)
+        scrollable_general_rules.pack(fill='both', expand=True)
+        scrollable_general_rules.columnconfigure(0, weight=1)
+        scrollable_general_rules.columnconfigure(1, weight=1)
+
+        self.show_general_rules()
+    
+    def show_general_rules(self):
+        for widget in scrollable_general_rules.grid_slaves():
+            widget.grid_remove()
+
+        label = ctk.CTkLabel(scrollable_general_rules, text="Rules Applied to All Connected Devices")
+        label.grid(row = 0, column = 0, sticky = N, pady = 20, padx = 10, columnspan = 2)
+        general_rules = get_firewall_rules()
+        try:
+            rules_without_index = [ {k: v for k, v in attributes.items() if (k != 'rule')} for attributes in general_rules]
+            for i, rule in enumerate(rules_without_index): 
+                rule_str = "\n".join([f"{key}: {value}" for key, value in rule.items()])
+                rule_label = ctk.CTkLabel(scrollable_general_rules, text=rule_str, width=350)
+                rule_label.grid(row=1+i, column=0, sticky = "E", pady=15, padx=10)
+            for i, rule in enumerate(general_rules):
+                button = ctk.CTkButton(scrollable_general_rules, text="edit rule")
+                button.grid(row=1+i, column=1, sticky = "W", pady=5, padx=10)
+        except:
+            print("first time loading")
+        self.after(7000, self.show_general_rules)
+        
+
+    def create_menubar(self, parent):
+        menubar = Menu(parent, bd=3, relief=RAISED)
+
+        filemenu = Menu(menubar, tearoff=0, relief=RAISED)
+        menubar.add_cascade(label="Devices", menu=filemenu)
+        filemenu.add_command(label="Connected devices", command=lambda: parent.show_frame(parent.HomePage))
+        filemenu.add_command(label="Managed devices", command=lambda: parent.show_frame(parent.ManagedDevices))
+  
+        help_menu = Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Help", menu=help_menu)
+        help_menu.add_command(label="About")
+        help_menu.add_separator()
+        help_menu.add_command(label="Exit", command=parent.quit)
+
+        return menubar
+    
+    
 if __name__ == "__main__":
     with app.app_context():
         App().mainloop()
