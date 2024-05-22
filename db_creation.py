@@ -33,7 +33,7 @@ class device(db.Model):
     MAC_address = db.Column(db.VARCHAR(17), nullable = False, unique = True)
     device_type = db.Column(db.Enum('Router', 'Extender', 'Mobile', 'Laptop', 'Computer', 'TV', 'Other'), nullable = False)
     users = relationship('user', secondary = rigths, back_populates='devices')
-    device_settings = relationship('device_setting', back_populates = 'device_')
+    device_settings = relationship('device_setting', back_populates = 'device_', cascade="all, delete-orphan")
     outgoing_connections = db.relationship('connection', foreign_keys='connection.iddevice_source', back_populates='source_device')
     incoming_connections = db.relationship('connection', foreign_keys='connection.iddevice_destination', back_populates='destination_device')
 
@@ -61,6 +61,7 @@ class device_setting(db.Model):
     end_time = db.Column(db.VARCHAR(8))
     start_date = db.Column(db.VARCHAR(10))
     end_date = db.Column(db.VARCHAR(10))
+    rule_number = db.Column(db.Integer)
     setting = relationship('settings', back_populates = 'device_settings')
     user_ = relationship('user', back_populates = 'device_settings')
     device_ = relationship('device', back_populates = 'device_settings')
