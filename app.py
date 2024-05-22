@@ -462,7 +462,7 @@ def get_firewall_rules(mac=None):
 
             for rule in rules_with_index:
                 if mac is None:
-                    if 'src_mac' and 'icmp_type' not in rule:
+                    if 'src_mac' and 'proto' not in rule:
                         filtered_rules.append(rule)
                 else:
                     if rule.get('src_mac') == mac:
@@ -484,8 +484,6 @@ class DeviceSettings(ctk.CTkFrame):
         self.parent = parent
         self.device_info = device_info
         self.show_device_settings()
-
-    
 
     def show_device_settings(self):
         
@@ -672,7 +670,10 @@ class DeviceSettings(ctk.CTkFrame):
         delete_button.grid(pady = 5)
 
         def edit_setting():
+            # existing_setting = device_setting.query.filter_by(iddevice_setting = setting_id).first()
+            # setting_value = existing_setting.setting_value
             new_name = name_entry.get()
+            
             try:               
                 with open('router_data.json') as data_file:
                     router_data = json.load(data_file)
@@ -685,6 +686,7 @@ class DeviceSettings(ctk.CTkFrame):
                 if rule_name != new_name:
                     change_name = f"uci set firewall.@rule[{rule_number}].name='{new_name}'"
                     self.execute_command(client, change_name)
+                    # setting_value["rule name"] = new_name
                 if start:
                     new_start = start_entry.get()
                     if start != new_start:
@@ -694,6 +696,7 @@ class DeviceSettings(ctk.CTkFrame):
                         else:
                             change_start = f"uci set firewall.@rule[{rule_number}].start_time='{new_start}'"
                             self.execute_command(client, change_start)
+                            # existing_setting.start_time = new_start
                 if stop:
                     new_stop = stop_entry.get()
                     if stop != new_stop:
@@ -703,12 +706,14 @@ class DeviceSettings(ctk.CTkFrame):
                         else:
                             change_stop = f"uci set firewall.@rule[{rule_number}].stop_time='{new_stop}'"
                             self.execute_command(client, change_stop)
+                            # existing_setting.end_time = new_stop
                 if days:
                     new_weekdays = weekdays_listbox.get()
                     weekdays_str = " ".join(new_weekdays)
                     if selected_days != new_weekdays:
                         change_weekdays = f"uci set firewall.@rule[{rule_number}].weekdays='{weekdays_str}'"
                         self.execute_command(client, change_weekdays)
+                        # setting_value["affected days"] = weekdays_str
                 if ip_value:
                     new_websites = websites_entry.get().strip().split(",")
                     new_websites = [ip.strip() for ip in new_websites]
@@ -724,11 +729,13 @@ class DeviceSettings(ctk.CTkFrame):
                     if ip_list != addresses_list:
                         change_websites = f"uci set firewall.@rule[{rule_number}].dest_ip='{addresses}'\n"
                         self.execute_command(client, change_websites)
+                        # setting_value["websites"] = addresses
                     else:
                         print("same websites as before")
                 final_command = """uci commit firewall
                                    service firewall restart"""
                 self.execute_command(client, final_command)
+                # db.session.commit()
                 client.close()
                 modal.destroy()
                 self.show_device_settings()
@@ -1020,8 +1027,9 @@ class Settings(ctk.CTkFrame):
             setting_time = datetime.now()
             try:
                 short_days = ' '.join([day[:3] for day in days])
-                setting_value = {"enabled": True,
-                                 "affected days": short_days}
+                setting_value = {   "rule name": name,
+                                    "affected days": short_days,
+                                    "enabled": True}
             except:
                 messagebox.showerror("Error", "Please select the affected days")
             try:
@@ -1128,8 +1136,10 @@ class Settings(ctk.CTkFrame):
         def block_website_access(rule_name, src_mac):
             rule_name = settingname_entry.get()
             websites = websites_entry.get().strip().split(",")
-            setting_value = {"enabled": True,
-                             "blocked websites": ", ".join(websites)}
+            setting_value = {   "rule name": rule_name,
+                                "websites": ", ".join(websites),
+                                "enabled": True
+                             }
             setting_time = datetime.now()
             try:
                 affected_device = db.session.query(device).filter(device.MAC_address == src_mac).first()
@@ -1261,8 +1271,10 @@ class Settings(ctk.CTkFrame):
             start = start_time.get()
             stop = stop_time.get()
             websites = websites_entry.get().strip().split(",")
-            setting_value = {"enabled": True,
-                             "allowed websites": ", ".join(websites)}
+            setting_value = {   "rule name": rule_name,
+                                "websites": ", ".join(websites),
+                                "enabled": True
+                             }
             setting_time = datetime.now()
             id_affected_device = None
             if start and stop:
@@ -1316,7 +1328,9 @@ class Settings(ctk.CTkFrame):
                 firewall_command += "service firewall restart\n" 
                 self.execute_command(client, firewall_command)
                 client.close()
-                self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start, stop)
+                global setting_id
+                setting_id = self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start, stop)
+                print(setting_id)
                 modal.destroy()
             except FileNotFoundError:
                 print("The JSON file wasn't found")
@@ -1332,6 +1346,8 @@ class Settings(ctk.CTkFrame):
             new_device_setting = device_setting(iduser=iduser, iddevice=iddevice, idsetting=idsetting, setting_value=setting_value, setting_time=setting_time, start_time=start_time, end_time = end_time)
             db.session.add(new_device_setting)
             db.session.commit()
+            setting_id = new_device_setting.iddevice_setting
+            return setting_id
 
 
 
