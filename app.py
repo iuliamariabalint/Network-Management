@@ -788,8 +788,8 @@ def edit_rules_modal(self, rule, mac = None):
                 print("The JSON file wasn't found")
 
         def delete_setting():
-            existing_setting = device_setting.query.filter_by(rule_number = rule_number).first()
-            print("existing setting:", existing_setting)
+            # existing_setting = device_setting.query.filter_by(rule_number = rule_number).first()
+            # print("existing setting:", existing_setting)
             try:               
                 with open('router_data.json') as data_file:
                     router_data = json.load(data_file)
@@ -804,9 +804,9 @@ def edit_rules_modal(self, rule, mac = None):
                 client.connect(hostname=host, username=username, password=password)
                 client.exec_command(command)
                 client.close()
-                if existing_setting:
-                    db.session.delete(existing_setting)
-                    db.session.commit()
+                # if existing_setting:
+                #     db.session.delete(existing_setting)
+                #     db.session.commit()
                 modal.destroy()    
                 calling_class = self.__class__.__name__
                 if calling_class == "DeviceSettings":
