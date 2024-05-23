@@ -540,7 +540,7 @@ class DeviceSettings(ctk.CTkFrame):
                 rule_label = ctk.CTkLabel(scrollable_frame, text=rule_str, width=350)
                 rule_label.grid(row=8+i, column=0, sticky = E, pady=15, padx=10)
             for i, rule in enumerate(active_rules):
-                button = ctk.CTkButton(scrollable_frame, text="edit rule", command = lambda rule = rule : self.edit_rules_modal(rule, mac_address))
+                button = ctk.CTkButton(scrollable_frame, text="edit rule", command = lambda rule = rule : edit_rules_modal(self, rule, mac_address))
                 button.grid(row=8+i, column=1, sticky = W, pady=5, padx=10)
         except:
             print("first time loading")
@@ -562,7 +562,29 @@ class DeviceSettings(ctk.CTkFrame):
                 db.session.commit()
             parent.show_frame(ManagedDevices)
 
-    def edit_rules_modal(self, rule, mac):
+    def create_menubar(self, parent):
+        menubar = Menu(parent, bd=3, relief=RAISED)
+
+        devicemenu = Menu(menubar, tearoff=0, relief=RAISED)
+        menubar.add_cascade(label="Devices", menu=devicemenu)
+        devicemenu.add_command(label="Connected devices", command=lambda: parent.show_frame(parent.HomePage))
+
+        setttingsmenu = Menu(menubar, tearoff=0, relief=RAISED)
+        menubar.add_cascade(label="Settings", menu=setttingsmenu)
+        setttingsmenu.add_command(label="New", command=lambda: parent.show_frame(parent.Settings)) 
+        setttingsmenu.add_command(label="General rules", command=lambda: parent.show_frame(parent.GeneralRules)) 
+        setttingsmenu.add_command(label="Usual rules", command=lambda: parent.show_frame(parent.GeneralRules)) 
+ 
+        ## help menu
+        help_menu = Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Help", menu=help_menu)
+        help_menu.add_command(label="About")
+        help_menu.add_separator()
+        help_menu.add_command(label="Exit", command=parent.quit) 
+
+        return menubar
+    
+def edit_rules_modal(self, rule, mac = None):
         modal = ctk.CTkToplevel(self.parent)
         modal.configure(bg="#333333")
         modal.title("Setting")
@@ -678,8 +700,11 @@ class DeviceSettings(ctk.CTkFrame):
         delete_button.grid(pady = 5)
 
         def edit_setting():
-            # existing_setting = device_setting.query.filter_by(iddevice_setting = setting_id).first()
-            # setting_value = existing_setting.setting_value
+            # existing_setting = device_setting.query.filter_by(rule_number = rule_number).first()
+            # print("existing setting:", existing_setting)
+            # if existing_setting:
+            #     setting_value = existing_setting.setting_value
+            #     print(setting_value)
             new_name = name_entry.get()
             
             try:               
@@ -693,8 +718,10 @@ class DeviceSettings(ctk.CTkFrame):
                 client.connect(hostname=host, username=username, password=password)
                 if rule_name != new_name:
                     change_name = f"uci set firewall.@rule[{rule_number}].name='{new_name}'"
-                    self.execute_command(client, change_name)
+                    execute_command(client, change_name)
                     # setting_value["rule name"] = new_name
+                    # print(setting_value)
+                    # existing_setting.setting_value = setting_value   
                 if start:
                     new_start = start_entry.get()
                     if start != new_start:
@@ -703,7 +730,7 @@ class DeviceSettings(ctk.CTkFrame):
                             return
                         else:
                             change_start = f"uci set firewall.@rule[{rule_number}].start_time='{new_start}'"
-                            self.execute_command(client, change_start)
+                            execute_command(client, change_start)
                             # existing_setting.start_time = new_start
                 if stop:
                     new_stop = stop_entry.get()
@@ -713,15 +740,18 @@ class DeviceSettings(ctk.CTkFrame):
                             return
                         else:
                             change_stop = f"uci set firewall.@rule[{rule_number}].stop_time='{new_stop}'"
-                            self.execute_command(client, change_stop)
+                            execute_command(client, change_stop)
                             # existing_setting.end_time = new_stop
                 if days:
                     new_weekdays = weekdays_listbox.get()
                     weekdays_str = " ".join(new_weekdays)
                     if selected_days != new_weekdays:
                         change_weekdays = f"uci set firewall.@rule[{rule_number}].weekdays='{weekdays_str}'"
-                        self.execute_command(client, change_weekdays)
+                        execute_command(client, change_weekdays)
                         # setting_value["affected days"] = weekdays_str
+                        # print(setting_value)
+                        # existing_setting.setting_value = setting_value
+
                 if ip_value:
                     new_websites = websites_entry.get().strip().split(",")
                     new_websites = [ip.strip() for ip in new_websites]
@@ -730,27 +760,36 @@ class DeviceSettings(ctk.CTkFrame):
                     addresses_list = []
                     for website in new_websites:
                         ip_command = f"nslookup {website} | awk '/^Address: / {{ print $2 }}'"
-                        ip_address = self.execute_command(client, ip_command)
+                        ip_address = execute_command(client, ip_command)
                         first_ip_address = ip_address.split('\n')[0].strip()
                         addresses_list.append(first_ip_address)
                         addresses = " ".join(addresses_list)
                     if ip_list != addresses_list:
                         change_websites = f"uci set firewall.@rule[{rule_number}].dest_ip='{addresses}'\n"
-                        self.execute_command(client, change_websites)
+                        execute_command(client, change_websites)
                         # setting_value["websites"] = addresses
+                        # print(setting_value)
+                        # existing_setting.setting_value = setting_value
                     else:
                         print("same websites as before")
                 final_command = """uci commit firewall
                                    service firewall restart"""
-                self.execute_command(client, final_command)
-                # db.session.commit()
+                execute_command(client, final_command)
                 client.close()
+                # db.session.commit()
+                # print("Changes committed to the database")
                 modal.destroy()
-                self.show_device_settings()
+                calling_class = self.__class__.__name__
+                if calling_class == "DeviceSettings":
+                    self.show_device_settings()
+                if calling_class == "GeneralRules":
+                   self.show_general_rules()
             except FileNotFoundError:
                 print("The JSON file wasn't found")
 
         def delete_setting():
+            existing_setting = device_setting.query.filter_by(rule_number = rule_number).first()
+            print("existing setting:", existing_setting)
             try:               
                 with open('router_data.json') as data_file:
                     router_data = json.load(data_file)
@@ -765,36 +804,17 @@ class DeviceSettings(ctk.CTkFrame):
                 client.connect(hostname=host, username=username, password=password)
                 client.exec_command(command)
                 client.close()
+                if existing_setting:
+                    db.session.delete(existing_setting)
+                    db.session.commit()
                 modal.destroy()    
-                self.show_device_settings()
+                calling_class = self.__class__.__name__
+                if calling_class == "DeviceSettings":
+                    self.show_device_settings()
+                if calling_class == "GeneralRules":
+                   self.show_general_rules()
             except FileNotFoundError:
                 print("The JSON file wasn't found")
-
-    def execute_command(self, client, command):
-        stdin, stdout, stderr = client.exec_command(command)
-        return stdout.read().decode() 
-
-    def create_menubar(self, parent):
-        menubar = Menu(parent, bd=3, relief=RAISED)
-
-        devicemenu = Menu(menubar, tearoff=0, relief=RAISED)
-        menubar.add_cascade(label="Devices", menu=devicemenu)
-        devicemenu.add_command(label="Connected devices", command=lambda: parent.show_frame(parent.HomePage))
-
-        setttingsmenu = Menu(menubar, tearoff=0, relief=RAISED)
-        menubar.add_cascade(label="Settings", menu=setttingsmenu)
-        setttingsmenu.add_command(label="New", command=lambda: parent.show_frame(parent.Settings)) 
-        setttingsmenu.add_command(label="General rules", command=lambda: parent.show_frame(parent.GeneralRules)) 
-        setttingsmenu.add_command(label="Usual rules", command=lambda: parent.show_frame(parent.GeneralRules)) 
- 
-        ## help menu
-        help_menu = Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Help", menu=help_menu)
-        help_menu.add_command(label="About")
-        help_menu.add_separator()
-        help_menu.add_command(label="Exit", command=parent.quit) 
-
-        return menubar
 
 #---------------------------------------------------SETTINGS FRAME / CONTAINER --------------------------------------------------
 from functools import partial
@@ -1074,11 +1094,11 @@ class Settings(ctk.CTkFrame):
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                 client.connect(hostname=host, username=username, password=password)
                 client.exec_command(command)
+                rule_number = get_rule_number(client, -1)
                 client.close()
-
             except FileNotFoundError:
                 print("The JSON file wasn't found")
-            self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start, stop)
+            self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start, stop, rule_number)
             modal.destroy()
 
     def block_website_modal(self):
@@ -1175,7 +1195,7 @@ class Settings(ctk.CTkFrame):
                 addresses_list = []
                 for website in websites:
                     ip_command = f"nslookup {website} | awk '/^Address: / {{ print $2 }}'"
-                    ip_address = self.execute_command(client, ip_command)
+                    ip_address = execute_command(client, ip_command)
                     first_ip_address = ip_address.split('\n')[0].strip()
                     addresses_list.append(first_ip_address)
                     addresses = " ".join(addresses_list)
@@ -1191,9 +1211,10 @@ class Settings(ctk.CTkFrame):
                 firewall_command += "uci commit firewall\n"
                 firewall_command += "service firewall restart\n"
 
-                self.execute_command(client, firewall_command)
+                execute_command(client, firewall_command)
+                rule_number = get_rule_number(client, -1)
                 client.close()
-                self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start_time = None, end_time = None)
+                self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start_time = None, end_time = None, rule_number=rule_number)
                 modal.destroy()
             except FileNotFoundError:
                 print("The JSON file wasn't found")
@@ -1282,10 +1303,13 @@ class Settings(ctk.CTkFrame):
             start = start_time.get()
             stop = stop_time.get()
             websites = websites_entry.get().strip().split(",")
-            setting_value = {   "rule name": rule_name,
-                                "websites": ", ".join(websites),
-                                "enabled": True
-                             }
+            setting_value_websites = {  "rule name": rule_name,
+                                        "websites": ", ".join(websites),
+                                        "enabled": True
+                                        }
+            setting_value_block = {    "rule name": "Block all access",
+                                        "enabled": True
+                                        }
             setting_time = datetime.now()
             id_affected_device = None
             if start and stop:
@@ -1312,7 +1336,7 @@ class Settings(ctk.CTkFrame):
                 addresses_list = []
                 for website in websites:
                     ip_command = f"nslookup {website} | awk '/^Address: / {{ print $2 }}'"
-                    ip_address = self.execute_command(client, ip_command)
+                    ip_address = execute_command(client, ip_command)
                     first_ip_address = ip_address.split('\n')[0].strip()
                     addresses_list.append(first_ip_address)
                     addresses = " ".join(addresses_list)
@@ -1337,28 +1361,23 @@ class Settings(ctk.CTkFrame):
                 firewall_command += "uci set firewall.@rule[-1].target='REJECT'\n"
                 firewall_command += "uci commit firewall\n"
                 firewall_command += "service firewall restart\n" 
-                self.execute_command(client, firewall_command)
+                execute_command(client, firewall_command)
+                rule_number_websites = get_rule_number(client, -2)
+                rule_number_block_access = get_rule_number(client, -1)
                 client.close()
-                global setting_id
-                setting_id = self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start, stop)
-                print(setting_id)
+                self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value_websites, setting_time, None, None, rule_number_websites)
+                self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value_block, setting_time, start, stop, rule_number_block_access)
                 modal.destroy()
             except FileNotFoundError:
                 print("The JSON file wasn't found")
             except Exception as e:
                 messagebox.showerror("Error", f"An error occurred: {e}")
+       
 
-            
-    def execute_command(self, client, command):
-        stdin, stdout, stderr = client.exec_command(command)
-        return stdout.read().decode()      
-
-    def save_devicesetting(self, iduser, iddevice, idsetting, setting_value, setting_time, start_time, end_time):
-            new_device_setting = device_setting(iduser=iduser, iddevice=iddevice, idsetting=idsetting, setting_value=setting_value, setting_time=setting_time, start_time=start_time, end_time = end_time)
+    def save_devicesetting(self, iduser, iddevice, idsetting, setting_value, setting_time, start_time, end_time, rule_number):
+            new_device_setting = device_setting(iduser=iduser, iddevice=iddevice, idsetting=idsetting, setting_value=setting_value, setting_time=setting_time, start_time=start_time, end_time = end_time, rule_number=rule_number)
             db.session.add(new_device_setting)
             db.session.commit()
-            setting_id = new_device_setting.iddevice_setting
-            return setting_id
 
 
     def create_menubar(self, parent):
@@ -1381,11 +1400,25 @@ class Settings(ctk.CTkFrame):
         help_menu.add_command(label="Exit", command=parent.quit)
 
         return menubar
+def execute_command(client, command):
+        stdin, stdout, stderr = client.exec_command(command)
+        return stdout.read().decode()
+
+def get_rule_number(client, rule_position):
+    command = "uci show firewall | grep '=rule'"
+    rules_str = execute_command(client, command)
+    lines = rules_str.strip().split('\n')
+    rule_line = lines[rule_position]
+    rule_index = rule_line.split('[')[1].split(']')[0]
+    return rule_index
+
+
+
 
 class GeneralRules(ctk.CTkFrame):
     def __init__(self, parent, container):
         super().__init__(container)
-        self.parent_window = parent
+        self.parent = parent
         global scrollable_general_rules
         scrollable_general_rules = ctk.CTkScrollableFrame(self)
         scrollable_general_rules.pack(fill='both', expand=True)
@@ -1401,7 +1434,6 @@ class GeneralRules(ctk.CTkFrame):
         label = ctk.CTkLabel(scrollable_general_rules, text="Rules Applied to All Connected Devices")
         label.grid(row = 0, column = 0, sticky = N, pady = 20, padx = 10, columnspan = 2)
         general_rules = get_firewall_rules()
-        print("general rules,", general_rules)
         try:
             rules_without_index = [ {k: v for k, v in attributes.items() if (k != 'rule')} for attributes in general_rules]
             for i, rule in enumerate(rules_without_index): 
@@ -1409,7 +1441,7 @@ class GeneralRules(ctk.CTkFrame):
                 rule_label = ctk.CTkLabel(scrollable_general_rules, text=rule_str, width=350)
                 rule_label.grid(row=1+i, column=0, sticky = "E", pady=15, padx=10)
             for i, rule in enumerate(general_rules):
-                button = ctk.CTkButton(scrollable_general_rules, text="edit rule")
+                button = ctk.CTkButton(scrollable_general_rules, text="edit rule", command = lambda rule = rule : edit_rules_modal(self, rule))
                 button.grid(row=1+i, column=1, sticky = "W", pady=5, padx=10)
         except:
             print("first time loading")
