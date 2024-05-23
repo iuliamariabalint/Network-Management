@@ -659,20 +659,19 @@ def edit_rules_modal(self, rule, mac = None):
         start = rule.get("start_time")
         stop = rule.get("stop_time")
 
+        label_start = ctk.CTkLabel(scrollable_frame, text = "Start time: (hh:mm:ss)")
+        label_start.grid(column = 0, pady = 5, sticky = "W")
+        start_entry = ctk.CTkEntry(scrollable_frame)
+        start_entry.grid(column = 0, sticky="nsew")
+        label_stop = ctk.CTkLabel(scrollable_frame, text = "Stop time: (hh:mm:ss)")
+        label_stop.grid(column = 0, pady = 5, sticky = "W")
+        stop_entry = ctk.CTkEntry(scrollable_frame)
+        stop_entry.grid(column = 0, sticky="nsew")
+        important = ctk.CTkLabel(scrollable_frame, text = "ATENTION: The router time zone is GMT", text_color="red")
+        important.grid(pady=5, sticky = "N")
         if start and stop:
-            label_start = ctk.CTkLabel(scrollable_frame, text = "Start time: (hh:mm:ss)")
-            label_start.grid(column = 0, pady = 5, sticky = "W")
-            start_entry = ctk.CTkEntry(scrollable_frame)
-            start_entry.insert(0, start)
-            start_entry.grid(column = 0, sticky="nsew")
-            label_stop = ctk.CTkLabel(scrollable_frame, text = "Stop time: (hh:mm:ss)")
-            label_stop.grid(column = 0, pady = 5, sticky = "W")
-            stop_entry = ctk.CTkEntry(scrollable_frame)
-            stop_entry.insert(0, stop)
-            stop_entry.grid(column = 0, sticky="nsew")
-            important = ctk.CTkLabel(scrollable_frame, text = "ATENTION: The router time zone is GMT", text_color="red")
-            important.grid(pady=5, sticky = "N")
-        
+            start_entry.insert(0, start) 
+            stop_entry.insert(0, stop) 
         days = rule.get("weekdays")
         affected_days = StringVar(value=days)
         if days:
@@ -690,7 +689,7 @@ def edit_rules_modal(self, rule, mac = None):
                         index = list(weekdays_dict.values()).index(day)
                         weekdays_listbox.activate(index)            
             weekdays_listbox.grid(sticky=tk.NSEW)
-        
+
         rule_number = rule["rule"]
         
         edit_button = ctk.CTkButton(scrollable_frame, text="edit", command = lambda : edit_setting())
@@ -706,7 +705,8 @@ def edit_rules_modal(self, rule, mac = None):
             #     setting_value = existing_setting.setting_value
             #     print(setting_value)
             new_name = name_entry.get()
-            
+            new_stop = stop_entry.get()
+            new_start = start_entry.get()
             try:               
                 with open('router_data.json') as data_file:
                     router_data = json.load(data_file)
@@ -723,7 +723,6 @@ def edit_rules_modal(self, rule, mac = None):
                     # print(setting_value)
                     # existing_setting.setting_value = setting_value   
                 if start:
-                    new_start = start_entry.get()
                     if start != new_start:
                         if len(new_start) != 8:
                             messagebox.showerror("Error", "Please enter the correct time format hh:mm:ss")
@@ -732,8 +731,14 @@ def edit_rules_modal(self, rule, mac = None):
                             change_start = f"uci set firewall.@rule[{rule_number}].start_time='{new_start}'"
                             execute_command(client, change_start)
                             # existing_setting.start_time = new_start
+                elif new_start:
+                    if len(new_start) != 8:
+                        messagebox.showerror("Error", "Please enter the correct time format hh:mm:ss")
+                        return
+                    else:
+                        add_start = f"uci set firewall.@rule[{rule_number}].start_time='{new_start}'"
+                        execute_command(client, add_start)
                 if stop:
-                    new_stop = stop_entry.get()
                     if stop != new_stop:
                         if len(new_stop) != 8:
                             messagebox.showerror("Error", "Please enter the correct time format hh:mm:ss")
@@ -742,6 +747,13 @@ def edit_rules_modal(self, rule, mac = None):
                             change_stop = f"uci set firewall.@rule[{rule_number}].stop_time='{new_stop}'"
                             execute_command(client, change_stop)
                             # existing_setting.end_time = new_stop
+                elif new_stop:
+                    if len(new_stop) != 8:
+                        messagebox.showerror("Error", "Please enter the correct time format hh:mm:ss")
+                        return
+                    else:
+                        add_stop = f"uci set firewall.@rule[{rule_number}].stop_time='{new_stop}'"
+                        execute_command(client, add_stop)    
                 if days:
                     new_weekdays = weekdays_listbox.get()
                     weekdays_str = " ".join(new_weekdays)
@@ -751,7 +763,6 @@ def edit_rules_modal(self, rule, mac = None):
                         # setting_value["affected days"] = weekdays_str
                         # print(setting_value)
                         # existing_setting.setting_value = setting_value
-
                 if ip_value:
                     new_websites = websites_entry.get().strip().split(",")
                     new_websites = [ip.strip() for ip in new_websites]
@@ -1121,21 +1132,24 @@ class Settings(ctk.CTkFrame):
         # Grab the focus to the modal window
         modal.grab_set()
 
-        title = ctk.CTkLabel(modal, text = "Block access to website")
+        scrollable_frame = ctk.CTkScrollableFrame(modal)
+        scrollable_frame.pack(fill='both', expand=True)
+
+        title = ctk.CTkLabel(scrollable_frame, text = "Block access to website")
         title.grid(pady = 5)
 
-        label = ctk.CTkLabel(modal, text = "Rule Name:")
+        label = ctk.CTkLabel(scrollable_frame, text = "Rule Name:")
         label.grid(padx = 5, pady = 10, sticky = "W")
 
         setting_name = "Block websites"
-        settingname_entry = ctk.CTkEntry(modal)
+        settingname_entry = ctk.CTkEntry(scrollable_frame)
         settingname_entry.insert(0, setting_name)
         settingname_entry.grid(padx = 5, sticky=NSEW)
 
-        label = ctk.CTkLabel(modal, text = "Enter websites to block (separated by comma):")
+        label = ctk.CTkLabel(scrollable_frame, text = "Enter websites to block (separated by comma):")
         label.grid(pady=10)
 
-        websites_entry = ctk.CTkEntry(modal)
+        websites_entry = ctk.CTkEntry(scrollable_frame)
         websites_entry.grid(sticky=NSEW)
 
         devices = db.session.query(device.device_name, device.MAC_address).all()
@@ -1152,19 +1166,30 @@ class Settings(ctk.CTkFrame):
             else:
                 print("MAC address not found for device:", selected_device)
         
-        device_dropdown = ttk.Combobox(modal, values=list(device_info.keys()), width = 30, state = "readonly")
+        device_dropdown = ttk.Combobox(scrollable_frame, values=list(device_info.keys()), width = 30, state = "readonly")
         device_dropdown.set("Select Device")
         device_dropdown.grid(padx=10, pady=10)
 
-        mac_label = ctk.CTkLabel(modal, text="MAC Address: ")
+        mac_label = ctk.CTkLabel(scrollable_frame, text="MAC Address: ")
         mac_label.grid(padx=10, pady=10)
 
         device_dropdown.bind("<<ComboboxSelected>>", on_device_selected)
 
-        done_button = ctk.CTkButton(modal, text = "Block", command = lambda: block_website_access(settingname_entry, selected_mac_address))
+        start_time = ctk.CTkEntry(scrollable_frame, placeholder_text = "Start Time (hh:mm:ss)")
+        start_time.grid(pady = 12, sticky = "N")
+
+        stop_time = ctk.CTkEntry(scrollable_frame, placeholder_text = "Stop Time (hh:mm:ss)")
+        stop_time.grid(pady = 12, sticky = "N")
+
+        done_button = ctk.CTkButton(scrollable_frame, text = "Submit", command = lambda: block_website_access(settingname_entry, selected_mac_address))
         done_button.grid(pady = 10)
 
+        important = ctk.CTkLabel(scrollable_frame, text = "ATENTION: The router time zone is GMT", text_color="red")
+        important.grid(pady=10, sticky = "N")
+
         def block_website_access(rule_name, src_mac):
+            start = start_time.get()
+            stop = stop_time.get()
             rule_name = settingname_entry.get()
             websites = websites_entry.get().strip().split(",")
             setting_value = {   "rule name": rule_name,
@@ -1177,6 +1202,10 @@ class Settings(ctk.CTkFrame):
                 id_affected_device = affected_device.iddevice
             except:
                 messagebox.showerror("Error", "Please select a device")
+            if start and stop:
+                if len(start) != 8 or len(stop) != 8:
+                    messagebox.showerror("Error", "Please enter the correct time format hh:mm:ss")
+                    return
             if websites == [""]:
                 messagebox.showerror("Error", "Please enter at least one website to block.")
                 return
@@ -1206,6 +1235,9 @@ class Settings(ctk.CTkFrame):
                 firewall_command += f"uci set firewall.@rule[-1].src_mac='{src_mac}'\n"
                 firewall_command += f"uci set firewall.@rule[-1].dest_ip='{addresses}'\n"
                 firewall_command += "uci set firewall.@rule[-1].dest='wan'\n"
+                if start and stop :
+                    firewall_command += f"uci set firewall.@rule[-1].start_time={start}\n"
+                    firewall_command += f"uci set firewall.@rule[-1].stop_time={stop}\n"
                 firewall_command += "uci set firewall.@rule[-1].proto='all'\n"
                 firewall_command += "uci set firewall.@rule[-1].target='REJECT'\n"
                 firewall_command += "uci commit firewall\n"
@@ -1214,7 +1246,7 @@ class Settings(ctk.CTkFrame):
                 execute_command(client, firewall_command)
                 rule_number = get_rule_number(client, -1)
                 client.close()
-                self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start_time = None, end_time = None, rule_number=rule_number)
+                self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start, stop, rule_number)
                 modal.destroy()
             except FileNotFoundError:
                 print("The JSON file wasn't found")
@@ -1400,6 +1432,7 @@ class Settings(ctk.CTkFrame):
         help_menu.add_command(label="Exit", command=parent.quit)
 
         return menubar
+    
 def execute_command(client, command):
         stdin, stdout, stderr = client.exec_command(command)
         return stdout.read().decode()
@@ -1411,9 +1444,6 @@ def get_rule_number(client, rule_position):
     rule_line = lines[rule_position]
     rule_index = rule_line.split('[')[1].split(']')[0]
     return rule_index
-
-
-
 
 class GeneralRules(ctk.CTkFrame):
     def __init__(self, parent, container):
