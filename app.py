@@ -614,8 +614,8 @@ def edit_rules_modal(self, rule, mac = None):
         label = ctk.CTkLabel(scrollable_frame, text = "Rule Name:")
         label.grid(column = 0, pady = 10, sticky = "W")
 
-        rule_name = rule["name"]
-        print(rule_name)
+        rule_name = rule["name"].split("@")[1]
+
         name_entry = ctk.CTkEntry(scrollable_frame)
         name_entry.insert(0, rule_name)
         name_entry.grid(column = 0, sticky="nsew")
@@ -698,13 +698,21 @@ def edit_rules_modal(self, rule, mac = None):
         delete_button = ctk.CTkButton(scrollable_frame, fg_color="transparent", hover_color="#F24A3B", text="delete", command = lambda : delete_setting())
         delete_button.grid(pady = 5)
 
+        start_index = rule["name"].index('-') + 1
+        end_index = rule["name"].index('@')
+        iddevice_setting = rule["name"][start_index:end_index]
+        existing_setting = device_setting.query.filter_by(iddevice_setting = iddevice_setting).first()
+
         def edit_setting():
             # existing_setting = device_setting.query.filter_by(rule_number = rule_number).first()
             # print("existing setting:", existing_setting)
             # if existing_setting:
             #     setting_value = existing_setting.setting_value
             #     print(setting_value)
-            new_name = name_entry.get()
+            name = name_entry.get()
+            if existing_setting:
+                setting_value = existing_setting.setting_value
+                new_name = f"SafeNet-{iddevice_setting}@{name}"
             new_stop = stop_entry.get()
             new_start = start_entry.get()
             try:               
@@ -719,9 +727,9 @@ def edit_rules_modal(self, rule, mac = None):
                 if rule_name != new_name:
                     change_name = f"uci set firewall.@rule[{rule_number}].name='{new_name}'"
                     execute_command(client, change_name)
-                    # setting_value["rule name"] = new_name
-                    # print(setting_value)
-                    # existing_setting.setting_value = setting_value   
+                    setting_value["rule name"] = new_name
+                    print(setting_value)
+                    existing_setting.setting_value = setting_value   
                 if start:
                     if start != new_start:
                         if len(new_start) != 8:
@@ -730,7 +738,7 @@ def edit_rules_modal(self, rule, mac = None):
                         else:
                             change_start = f"uci set firewall.@rule[{rule_number}].start_time='{new_start}'"
                             execute_command(client, change_start)
-                            # existing_setting.start_time = new_start
+                            existing_setting.start_time = new_start
                 elif new_start:
                     if len(new_start) != 8:
                         messagebox.showerror("Error", "Please enter the correct time format hh:mm:ss")
@@ -738,6 +746,7 @@ def edit_rules_modal(self, rule, mac = None):
                     else:
                         add_start = f"uci set firewall.@rule[{rule_number}].start_time='{new_start}'"
                         execute_command(client, add_start)
+                        existing_setting.start_time = new_start
                 if stop:
                     if stop != new_stop:
                         if len(new_stop) != 8:
@@ -746,23 +755,24 @@ def edit_rules_modal(self, rule, mac = None):
                         else:
                             change_stop = f"uci set firewall.@rule[{rule_number}].stop_time='{new_stop}'"
                             execute_command(client, change_stop)
-                            # existing_setting.end_time = new_stop
+                            existing_setting.end_time = new_stop
                 elif new_stop:
                     if len(new_stop) != 8:
                         messagebox.showerror("Error", "Please enter the correct time format hh:mm:ss")
                         return
                     else:
                         add_stop = f"uci set firewall.@rule[{rule_number}].stop_time='{new_stop}'"
-                        execute_command(client, add_stop)    
+                        execute_command(client, add_stop)
+                        existing_setting.end_time = new_stop  
                 if days:
                     new_weekdays = weekdays_listbox.get()
                     weekdays_str = " ".join(new_weekdays)
                     if selected_days != new_weekdays:
                         change_weekdays = f"uci set firewall.@rule[{rule_number}].weekdays='{weekdays_str}'"
                         execute_command(client, change_weekdays)
-                        # setting_value["affected days"] = weekdays_str
-                        # print(setting_value)
-                        # existing_setting.setting_value = setting_value
+                        setting_value["affected days"] = weekdays_str
+                        print(setting_value)
+                        existing_setting.setting_value = setting_value
                 if ip_value:
                     new_websites = websites_entry.get().strip().split(",")
                     new_websites = [ip.strip() for ip in new_websites]
@@ -778,17 +788,17 @@ def edit_rules_modal(self, rule, mac = None):
                     if ip_list != addresses_list:
                         change_websites = f"uci set firewall.@rule[{rule_number}].dest_ip='{addresses}'\n"
                         execute_command(client, change_websites)
-                        # setting_value["websites"] = addresses
-                        # print(setting_value)
-                        # existing_setting.setting_value = setting_value
+                        setting_value["websites"] = addresses
+                        print(setting_value)
+                        existing_setting.setting_value = setting_value
                     else:
                         print("same websites as before")
                 final_command = """uci commit firewall
                                    service firewall restart"""
                 execute_command(client, final_command)
                 client.close()
-                # db.session.commit()
-                # print("Changes committed to the database")
+                db.session.commit()
+                print("Changes committed to the database")
                 modal.destroy()
                 calling_class = self.__class__.__name__
                 if calling_class == "DeviceSettings":
@@ -799,8 +809,6 @@ def edit_rules_modal(self, rule, mac = None):
                 print("The JSON file wasn't found")
 
         def delete_setting():
-            # existing_setting = device_setting.query.filter_by(rule_number = rule_number).first()
-            # print("existing setting:", existing_setting)
             try:               
                 with open('router_data.json') as data_file:
                     router_data = json.load(data_file)
@@ -815,9 +823,9 @@ def edit_rules_modal(self, rule, mac = None):
                 client.connect(hostname=host, username=username, password=password)
                 client.exec_command(command)
                 client.close()
-                # if existing_setting:
-                #     db.session.delete(existing_setting)
-                #     db.session.commit()
+                if existing_setting:
+                    db.session.delete(existing_setting)
+                    db.session.commit()
                 modal.destroy()    
                 calling_class = self.__class__.__name__
                 if calling_class == "DeviceSettings":
@@ -1082,12 +1090,22 @@ class Settings(ctk.CTkFrame):
             if len(start) != 8 or len(stop) != 8:
                 messagebox.showerror("Error", "Please enter the correct time format hh:mm:ss")
                 return
+            
             try:
                 with open('router_data.json') as data_file:
                     router_data = json.load(data_file)
+                
+                host = router_data['ip_address']
+                username = router_data['router_user']
+                password = router_data['router_password']
+                client = paramiko.SSHClient()
+                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                client.connect(hostname=host, username=username, password=password)
+                id_devicesetting = self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start, stop)
+                rule_name = f"SafeNet-{id_devicesetting}@{name}"
 
                 command = f"""uci add firewall rule
-                            uci set firewall.@rule[-1].name={name}
+                            uci set firewall.@rule[-1].name={rule_name}
                             uci set firewall.@rule[-1].src={src}
                             uci set firewall.@rule[-1].src_mac={mac}
                             uci set firewall.@rule[-1].dest={dest}
@@ -1097,19 +1115,11 @@ class Settings(ctk.CTkFrame):
                             uci set firewall.@rule[-1].target={target}
                             uci commit firewall
                             service firewall restart"""
-
-                host = router_data['ip_address']
-                username = router_data['router_user']
-                password = router_data['router_password']
-                client = paramiko.SSHClient()
-                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                client.connect(hostname=host, username=username, password=password)
-                client.exec_command(command)
-                rule_number = get_rule_number(client, -1)
+                execute_command(client, command)
+                # rule_number = get_rule_number(client, -1)
                 client.close()
             except FileNotFoundError:
                 print("The JSON file wasn't found")
-            self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start, stop, rule_number)
             modal.destroy()
 
     def block_website_modal(self):
@@ -1191,9 +1201,9 @@ class Settings(ctk.CTkFrame):
         def block_website_access(rule_name, src_mac):
             start = start_time.get()
             stop = stop_time.get()
-            rule_name = settingname_entry.get()
+            name = settingname_entry.get()
             websites = websites_entry.get().strip().split(",")
-            setting_value = {   "rule name": rule_name,
+            setting_value = {   "rule name": name,
                                 "websites": ", ".join(websites),
                                 "enabled": True
                              }
@@ -1210,6 +1220,7 @@ class Settings(ctk.CTkFrame):
             if websites == [""]:
                 messagebox.showerror("Error", "Please enter at least one website to block.")
                 return
+            
             try:               
                 with open('router_data.json') as data_file:
                     router_data = json.load(data_file)
@@ -1222,6 +1233,8 @@ class Settings(ctk.CTkFrame):
                 client = paramiko.SSHClient()
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                 client.connect(hostname=host, username=username, password=password)
+                id_devicesetting = self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start, stop)
+                rule_name = f"SafeNet-{id_devicesetting}@{name}"
                 addresses_list = []
                 for website in websites:
                     ip_command = f"nslookup {website} | awk '/^Address: / {{ print $2 }}'"
@@ -1229,7 +1242,6 @@ class Settings(ctk.CTkFrame):
                     first_ip_address = ip_address.split('\n')[0].strip()
                     addresses_list.append(first_ip_address)
                     addresses = " ".join(addresses_list)
-                print(addresses)
                 firewall_command = "uci add firewall rule\n"
                 firewall_command += f"uci set firewall.@rule[-1].name='{rule_name}'\n"
                 firewall_command += "uci set firewall.@rule[-1].src='lan'\n"
@@ -1245,9 +1257,8 @@ class Settings(ctk.CTkFrame):
                 firewall_command += "service firewall restart\n"
 
                 execute_command(client, firewall_command)
-                rule_number = get_rule_number(client, -1)
+                # rule_number = get_rule_number(client, -1)
                 client.close()
-                self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start, stop, rule_number)
                 modal.destroy()
             except FileNotFoundError:
                 print("The JSON file wasn't found")
@@ -1332,11 +1343,11 @@ class Settings(ctk.CTkFrame):
         important.grid(pady=10, sticky = "N")
 
         def allow_websites(selected_mac):
-            rule_name = settingname_entry.get()
+            name = settingname_entry.get()
             start = start_time.get()
             stop = stop_time.get()
             websites = websites_entry.get().strip().split(",")
-            setting_value_websites = {  "rule name": rule_name,
+            setting_value_websites = {  "rule name": name,
                                         "websites": ", ".join(websites),
                                         "enabled": True
                                         }
@@ -1355,7 +1366,15 @@ class Settings(ctk.CTkFrame):
             if selected_mac:
                 affected_device = db.session.query(device).filter(device.MAC_address == selected_mac).first()
                 id_affected_device = affected_device.iddevice
-            
+
+            # existing_setting1 = device.query.filter_by(MAC_address =id_devicesetting1).first()
+            # existing_setting2 = device.query.filter_by(MAC_address =id_devicesetting2).first()
+            # if existing_setting1:
+            #     existing_setting1.rule_name = rule_name_websites
+            #     db.session.commit()
+            # elif existing_setting2:
+            #     existing_setting2.rule_name = rule_name_websites
+            #     db.session.commit()
             try:               
                 with open('router_data.json') as data_file:
                     router_data = json.load(data_file)
@@ -1366,6 +1385,10 @@ class Settings(ctk.CTkFrame):
                 client = paramiko.SSHClient()
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                 client.connect(hostname=host, username=username, password=password)
+                id_devicesetting1 = self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value_websites, setting_time, None, None)
+                id_devicesetting2 = self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value_block, setting_time, start, stop)
+                rule_name_websites = f"SafeNet-{id_devicesetting1}@{name}"
+                rule_name_block = f"SafeNet-{id_devicesetting2}@Block all access"
                 addresses_list = []
                 for website in websites:
                     ip_command = f"nslookup {website} | awk '/^Address: / {{ print $2 }}'"
@@ -1374,7 +1397,7 @@ class Settings(ctk.CTkFrame):
                     addresses_list.append(first_ip_address)
                     addresses = " ".join(addresses_list)
                 firewall_command = "uci add firewall rule\n"
-                firewall_command += f"uci set firewall.@rule[-1].name='{rule_name}'\n"
+                firewall_command += f"uci set firewall.@rule[-1].name='{rule_name_websites}'\n"
                 firewall_command += "uci set firewall.@rule[-1].src='lan'\n"
                 if selected_mac:
                     firewall_command += f"uci set firewall.@rule[-1].src_mac='{selected_mac}'\n"
@@ -1383,7 +1406,7 @@ class Settings(ctk.CTkFrame):
                 firewall_command += "uci set firewall.@rule[-1].target='ACCEPT'\n"
                 firewall_command += "uci commit firewall\n"
                 firewall_command += "uci add firewall rule\n"
-                firewall_command += f"uci set firewall.@rule[-1].name='Block all access'\n"
+                firewall_command += f"uci set firewall.@rule[-1].name='{rule_name_block}'\n"
                 firewall_command += "uci set firewall.@rule[-1].src='lan'\n"
                 if selected_mac:
                     firewall_command += f"uci set firewall.@rule[-1].src_mac='{selected_mac}'\n"
@@ -1395,11 +1418,9 @@ class Settings(ctk.CTkFrame):
                 firewall_command += "uci commit firewall\n"
                 firewall_command += "service firewall restart\n" 
                 execute_command(client, firewall_command)
-                rule_number_websites = get_rule_number(client, -2)
-                rule_number_block_access = get_rule_number(client, -1)
+                # rule_number_websites = get_rule_number(client, -2)
+                # rule_number_block_access = get_rule_number(client, -1)
                 client.close()
-                self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value_websites, setting_time, None, None, rule_number_websites)
-                self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value_block, setting_time, start, stop, rule_number_block_access)
                 modal.destroy()
             except FileNotFoundError:
                 print("The JSON file wasn't found")
@@ -1407,10 +1428,12 @@ class Settings(ctk.CTkFrame):
                 messagebox.showerror("Error", f"An error occurred: {e}")
        
 
-    def save_devicesetting(self, iduser, iddevice, idsetting, setting_value, setting_time, start_time, end_time, rule_number):
-            new_device_setting = device_setting(iduser=iduser, iddevice=iddevice, idsetting=idsetting, setting_value=setting_value, setting_time=setting_time, start_time=start_time, end_time = end_time, rule_number=rule_number)
+    def save_devicesetting(self, iduser, iddevice, idsetting, setting_value, setting_time, start_time, end_time):
+            new_device_setting = device_setting(iduser=iduser, iddevice=iddevice, idsetting=idsetting, setting_value=setting_value, setting_time=setting_time, start_time=start_time, end_time = end_time)
             db.session.add(new_device_setting)
             db.session.commit()
+            id_devicesetting = new_device_setting.iddevice_setting
+            return id_devicesetting
 
 
     def create_menubar(self, parent):
