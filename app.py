@@ -1055,7 +1055,7 @@ class Settings(ctk.CTkFrame):
         action = ctk.CTkLabel(scrollable_frame, text = f"Action: {target}")
         action.grid(pady=10, sticky = "N")
 
-        done_button = ctk.CTkButton(scrollable_frame, text="done", command = lambda : time_restriction_setting(settingname_entry,src,selected_mac_address,dest,start_time,stop_time,weekdays_listbox,target))
+        done_button = ctk.CTkButton(scrollable_frame, text="Submit", command = lambda : time_restriction_setting(settingname_entry,src,selected_mac_address,dest,start_time,stop_time,weekdays_listbox,target))
         done_button.grid(padx=5, pady=5, sticky = "N") 
 
         important = ctk.CTkLabel(scrollable_frame, text = "ATENTION: The router time zone is GMT", text_color="red")
@@ -1116,6 +1116,7 @@ class Settings(ctk.CTkFrame):
         modal = ctk.CTkToplevel(self.parent_window)
         modal.configure(bg="#333333")
         modal.title("Setting")
+        modal.geometry("300x300")
 
         # Calculate the position relative to the parent window
         parent_x = self.parent_window.winfo_rootx()
@@ -1339,7 +1340,7 @@ class Settings(ctk.CTkFrame):
                                         "websites": ", ".join(websites),
                                         "enabled": True
                                         }
-            setting_value_block = {    "rule name": "Block all access",
+            setting_value_block = {     "rule name": "Block all access",
                                         "enabled": True
                                         }
             setting_time = datetime.now()
