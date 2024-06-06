@@ -203,7 +203,7 @@ class RouterDataPage(ctk.CTkFrame):
                 password = data['router_password']
                 client = paramiko.SSHClient()
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                client.connect(hostname=host, username=username, password=password, auth_timeout=5, timeout=3) 
+                client.connect(hostname=host, username=username, password=password, auth_timeout=4, timeout=4) 
                 with open("router_data.json", "w") as file:
                     json.dump(data, file)
                 parent.show_frame(parent.HomePage)
