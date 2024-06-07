@@ -170,6 +170,7 @@ class SignupPage(ctk.CTkFrame):
 
 #---------------------------------------- ROUTER-DATA-PAGE / CONTAINER ------------------------------------------------------------------------
 import json
+from PIL import Image
 class RouterDataPage(ctk.CTkFrame):
     def __init__(self, parent, container):
         super().__init__(container)
@@ -177,13 +178,14 @@ class RouterDataPage(ctk.CTkFrame):
         info = ctk.CTkLabel(self, text = "Please enter the router data")
         info.pack(pady = 12, padx = 10)
 
-        user_entry = ctk.CTkEntry(self, placeholder_text = "router admin user")
+        user_entry = ctk.CTkEntry(self, placeholder_text = "Router admin")
         user_entry.pack(pady = 12, padx = 10)
 
-        password_entry = ctk.CTkEntry(self, placeholder_text = "router password", show="*")
+        password_entry = ctk.CTkEntry(self, placeholder_text = "Router password", show="*")
         password_entry.pack(pady = 12, padx = 10)
 
-        button = ctk.CTkButton(self, text = "Save", command = lambda: save_router_data(user_entry, password_entry))
+        image = ctk.CTkImage(Image.open("utils/arrow.png"))
+        button = ctk.CTkButton(self, text = "Connect", image = image, command = lambda: save_router_data(user_entry, password_entry), compound="left")
         button.pack(pady = 12, padx = 10)
 
         def save_router_data(user, password):
