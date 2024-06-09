@@ -3,9 +3,13 @@ from tkinter import *
 from tkinter import messagebox
 import customtkinter as ctk
 from flask import Flask
-from db_creation import db, user, settings
+from database.db_creation import db, user, settings
 import bcrypt
 import atexit, os
+from logic.authentication import login, signup
+from logic.router import save_router_data
+from logic.devices import get_active_clients, add_device, delete_device, edit_device
+from logic.firewall import get_firewall_rules, edit_rule, delete_rule
 
 
 app = Flask(__name__)
@@ -81,26 +85,13 @@ class LoginPage(ctk.CTkFrame):
         password_entry = ctk.CTkEntry(self, placeholder_text = "Password", show = "*")
         password_entry.pack(pady = 12, padx = 10)
 
-        button = ctk.CTkButton(self, text = "Login", command = lambda: login(username_entry, password_entry))
+        button = ctk.CTkButton(self, text = "Login", command = lambda: login(self, parent, username_entry, password_entry))
         button.pack(pady = 12, padx = 10)
 
         signup_button = ctk.CTkButton(self, text = "Sign up", cursor = 'hand2', command = lambda: parent.show_frame(parent.SignupPage))
         signup_button.pack(pady = 1, padx = 10)
 
-        def login(username, password):
-            username = username_entry.get()
-            password = password_entry.get()
-            user_data = user.query.filter_by(username=username).first()
-            if user_data:
-                stored_password = user_data.password
-                if bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
-                    self.get_iduser(username)
-                    parent.show_frame(parent.RouterDataPage)
-                else:
-                    messagebox.showerror("Login Failed", "Incorrect password.")
-            else:
-                messagebox.showerror("Login Failed", "Username not found.")
-
+        
     def get_iduser(self, username):
         global id_connected_user
         connected_user = db.session.query(user).filter_by(username=username).first()
@@ -141,29 +132,6 @@ class SignupPage(ctk.CTkFrame):
         login_button = ctk.CTkButton(self, text = "Login", cursor = 'hand2', command = lambda: parent.show_frame(parent.LoginPage))
         login_button.pack(pady = 1, padx = 10)
 
-        def signup(username_entry, password_entry, account_type_var):
-            username = username_entry.get()
-            password = password_entry.get()
-            account_type = account_type_var.get()
-            existing_user = user.query.filter_by(username=username).first()
-            if existing_user:
-                messagebox.showerror("Sign Up Failed", "Username already exists.")
-            else:
-                # Hash the password
-                hashed_password = hash_password(password)
-                # Create a new user
-                new_user = user(username=username, password=hashed_password, account_type=account_type)
-                db.session.add(new_user)
-                db.session.commit()
-                # Clear entry fields
-                username_entry.delete(0, 'end')
-                password_entry.delete(0, 'end')
-                messagebox.showinfo("Sign Up Successful", "Your account has been created successfully!")
-
-        def hash_password(password):
-            salt = bcrypt.gensalt()
-            hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
-            return hashed_password.decode('utf-8')
     
     def create_menubar(self, parent):
         pass
@@ -184,101 +152,36 @@ class RouterDataPage(ctk.CTkFrame):
         password_entry = ctk.CTkEntry(self, placeholder_text = "Router password", show="*")
         password_entry.pack(pady = 12, padx = 10)
 
-        image = ctk.CTkImage(Image.open("utils/arrow.png"))
-        button = ctk.CTkButton(self, text = "Connect", image = image, command = lambda: save_router_data(user_entry, password_entry), compound="left")
+        image = ctk.CTkImage(Image.open("assets/arrow.png"))
+        button = ctk.CTkButton(self, text = "Connect", image = image, command = lambda: save_router_data(parent, user_entry, password_entry), compound="left")
         button.pack(pady = 12, padx = 10)
-
-        def save_router_data(user, password):
-        # Hash the password
-        #hashed_password = hash_password(password_entry.get())
-            global credentials_saved
-            user = user_entry
-            password = password_entry
-            data = {
-            "router_user": user.get(),
-            "router_password": password.get(),
-            "ip_address": "192.168.99.1"
-            }
-            try:
-                host = data['ip_address']
-                username = data['router_user']
-                password = data['router_password']
-                client = paramiko.SSHClient()
-                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                client.connect(hostname=host, username=username, password=password, auth_timeout=4, timeout=4) 
-                with open("router_data.json", "w") as file:
-                    json.dump(data, file)
-                parent.show_frame(parent.HomePage)
-                return True 
-            except paramiko.AuthenticationException:
-                messagebox.showerror("Error","Wrong credentials")
-                return False
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to connect to the router: {str(e)}")
-            finally:
-                client.close()
-            
+         
     def create_menubar(self, parent):
         pass
 
 #---------------------------------------- HOME PAGE FRAME / CONTAINER ------------------------------------------------------------------------
 import paramiko
-from db_creation import device
+from database.db_creation import device
 
 class HomePage(ctk.CTkFrame):
     def __init__(self, parent, container):
         super().__init__(container)
 
         self.parent_window = parent
-        self.active_clients(parent)
+        self.show_active_clients()
         self.columnconfigure(0, weight=1)
         self.columnconfigure(1, weight=1)
-
         label = ctk.CTkLabel(self, text="Home Page")
         label.grid(row = 0, column = 0, columnspan = 2, sticky = N, pady = 20, padx = 10)
 
-    def active_clients(self, parent):
+    def show_active_clients(self):
+        dhcp_leases = get_active_clients(self)
         try:
-            with open('router_data.json') as data_file:
-                router_data = json.load(data_file)
-
-            command = "cat /tmp/dhcp.leases"
-
-            host = router_data['ip_address']
-            username = router_data['router_user']
-            password = router_data['router_password']
-            client = paramiko.SSHClient()
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            client.connect(hostname=host, username=username, password=password)
-
-            stdin, stdout, stderr = client.exec_command(command)
-            active_clients = stdout.read().decode()
-            client.close()
-            dhcp_leases = []
-            processed_macs = set()
-            
-
-            for i, line in enumerate(active_clients.split('\n')):
-                if line.strip():
-                    timestamp, mac_address, ip_address, hostname, client_id = line.split()
-                    dhcp_lease = {
-                        "timestamp": timestamp,
-                        "mac_address": mac_address,
-                        "ip_address": ip_address,
-                        "hostname": hostname,
-                        "client_id": client_id
-                    }
-                    dhcp_leases.append(dhcp_lease)
-                with open("active_clients.json", "w") as file:
-                    json.dump(dhcp_leases, file, indent = 4)
-
-                try: 
-                    if mac_address in processed_macs:
-                        continue
-                except:
-                    return None
-
-                processed_macs.add(mac_address)
+            for i, dhcp_lease in enumerate(dhcp_leases):
+                mac_address = dhcp_lease["mac_address"]
+                ip_address = dhcp_lease["ip_address"]
+                hostname = dhcp_lease["hostname"]
+                client_id = dhcp_lease["client_id"]
 
                 client_info = f"MAC Address: {mac_address}\nIP Address: {ip_address}\nHostname: {hostname}\nClient ID: {client_id}"
                 label = ctk.CTkLabel(self, text=client_info)
@@ -291,10 +194,17 @@ class HomePage(ctk.CTkFrame):
                 else:
                     button = ctk.CTkButton(self, text="manage", command = lambda info = dhcp_lease: self.settings_modal(info))
                     button.grid(row=i+1, column=1, sticky = W, pady=45, padx=10)
-
-        except FileNotFoundError:
-            print("The JSON file wasn't found")
-        self.after(5000, self.active_clients, parent)
+                label = ctk.CTkLabel(self, text=client_info)
+                label.grid(row=i+1, column=0, sticky = E, pady=30, padx=10)
+                if existing_device:
+                    manage_label = ctk.CTkLabel(self, text = "managed", text_color = "#5AD194", width=140)
+                    manage_label.grid(row=i+1, column=1, sticky=W, pady=45, padx=10)
+                else:
+                    button = ctk.CTkButton(self, text="manage", command = lambda info = dhcp_lease: self.settings_modal(info))
+                    button.grid(row=i+1, column=1, sticky = W, pady=45, padx=10)
+        except:
+            print("firt time running")
+        self.after(5000, self.show_active_clients)
 
     def settings_modal(self, client_info):
         modal = ctk.CTkToplevel(self.parent_window)
@@ -332,20 +242,7 @@ class HomePage(ctk.CTkFrame):
         device_type_dropdown.set("Select Device Type")
         device_type_dropdown.pack(pady = 5)
 
-        def add_device(devicename, mac_addr, devicetype):
-            device_name = devicename.get()
-            device_type = devicetype.get()
-            if device_type in device_types:
-                # Add device in database
-                device_ = device(device_name = device_name, MAC_address = mac_addr, device_type = device_type)
-                db.session.add(device_)
-                db.session.commit()
-                modal.destroy()
-            else: 
-                messagebox.showerror("Error", "Please select a device type.")
-
-
-        add_button = ctk.CTkButton(modal, text="Add", command = lambda: add_device(devicename_entry, mac_addr, device_type_dropdown))
+        add_button = ctk.CTkButton(modal, text="Add", command = lambda: add_device(modal, device_types, devicename_entry, mac_addr, device_type_dropdown))
         add_button.pack(side="top", anchor="n", padx=5, pady=5)
 
 
@@ -430,59 +327,7 @@ class ManagedDevices(ctk.CTkFrame):
         return menubar
 
 #---------------------------------------------------DEVICE SETTINGS FRAME / CONTAINER --------------------------------------------------
-def get_firewall_rules(mac=None):
-        try: 
-            with open('router_data.json') as data_file:
-               router_data = json.load(data_file)
-            host = router_data['ip_address']
-            username = router_data['router_user']
-            password = router_data['router_password']
 
-            command = "uci show firewall"
-            
-            client = paramiko.SSHClient()
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            client.connect(hostname=host, username=username, password=password)
-            stdin, stdout, stderr = client.exec_command(command)
-            output = stdout.read().decode()
-            client.close()
-            output = output.strip().split('\n')
-            rules = defaultdict(dict)
-            rule_components = re.compile(r'firewall\.@(\w+)\[(\d+)\]\.(\w+)=(.+)')
-
-            for line in output:
-                match = rule_components.match(line)
-                if match:
-                    rule_type, index, key, value = match.groups()
-                    full_key = f"{rule_type}_{index}"
-                    if 'rule' in full_key:
-                        rules[full_key][key] = value.strip("'")
-
-            rules_with_index = []
-            for key, attributes in rules.items():
-                rule_type, index = key.split('_')
-                attributes['rule'] = int(index)
-                rules_with_index.append(attributes)
-
-            with open('active_rules.json', 'w') as f:
-                json.dump(rules_with_index, f, indent=4)
-
-            # rules_without_index = [ {k: v for k, v in attributes.items() if k != 'rule'} for attributes in rules_with_index]
-            filtered_rules = []
-
-            for rule in rules_with_index:
-                if mac is None:
-                    if 'src_mac' not in rule and rule["rule"] > 8 :
-                        filtered_rules.append(rule)
-                else:
-                    if rule.get('src_mac') == mac:
-                        filtered_rules.append(rule)
-            return filtered_rules
-        except FileNotFoundError:
-            print("The JSON file wasn't found")
-
-import re
-from collections import defaultdict
 class DeviceSettings(ctk.CTkFrame):
     def __init__(self, parent, container, device_info = ("", "", ""), *args, **kwargs):
         super().__init__(container, *args, **kwargs)
@@ -524,16 +369,17 @@ class DeviceSettings(ctk.CTkFrame):
         device_type_dropdown = ctk.CTkOptionMenu(scrollable_frame, variable=device_type_var, values=device_types)
         device_type_dropdown.grid(row = 4, column = 0, pady=5, columnspan = 2, sticky = "n")
 
-        delete_button = ctk.CTkButton(scrollable_frame, fg_color="transparent", hover_color="#F24A3B", text="delete", command = lambda: delete(mac_address, self.parent))
+        delete_button = ctk.CTkButton(scrollable_frame, fg_color="transparent", hover_color="#F24A3B", text="delete", command = lambda: delete(self.parent))
         delete_button.grid(row = 5, column = 0, pady = 5, columnspan = 2, sticky = "n")
 
-        done_button = ctk.CTkButton(scrollable_frame, text="done", command = lambda: edit_device(self.parent, devicename_entry, mac_address, device_type_dropdown))
+        done_button = ctk.CTkButton(scrollable_frame, text="done", command = lambda: edit(self.parent))
         done_button.grid(row = 6, column = 0, padx=5, pady=5, columnspan = 2, sticky = "n")
 
         title2 = ctk.CTkLabel(scrollable_frame, text = "ACTIVE RULES")
         title2.grid(row = 7, column = 0, pady=15, columnspan = 2, sticky = "n")
 
         active_rules = get_firewall_rules(mac_address)
+        print("active rules for this device are: ", active_rules)
     
         try:
             rules_without_index = [ {k: v for k, v in attributes.items() if k != 'rule'} for attributes in active_rules]
@@ -547,22 +393,13 @@ class DeviceSettings(ctk.CTkFrame):
         except:
             print("first time loading")
 
-        def delete(mac_addr, parent):
-            existing_device = device.query.filter_by(MAC_address = mac_addr).first()
-            if existing_device:
-                db.session.delete(existing_device)
-                db.session.commit()
-                parent.show_frame(ManagedDevices)
-    
-        def edit_device(parent, devicename, mac_addr, devicetype):
-            device_name = devicename.get()
-            device_type = devicetype.get()
-            existing_device = device.query.filter_by(MAC_address = mac_addr).first()
-            if existing_device:
-                existing_device.device_name = device_name
-                existing_device.device_type = device_type
-                db.session.commit()
+        def delete(parent):
+            delete_device(mac_address, self.parent)
             parent.show_frame(ManagedDevices)
+    
+        def edit(parent):
+            edit_device(self.parent, devicename_entry, mac_address, device_type_dropdown)
+            parent.show_frame(ManagedDevices)   
 
     def create_menubar(self, parent):
         menubar = Menu(parent, bd=3, relief=RAISED)
@@ -625,6 +462,9 @@ def edit_rules_modal(self, rule, mac = None):
         mac_label = ctk.CTkLabel(scrollable_frame, text = f"Mac address: {mac}")
         mac_label.grid(column = 0, pady = 10, sticky = "W")
 
+        selected_days = []
+        weekdays_listbox = None
+        websites_entry = None
         ip_value = rule.get("dest_ip")
         if ip_value:
             modal.geometry("220x240")
@@ -657,7 +497,7 @@ def edit_rules_modal(self, rule, mac = None):
             websites_entry = ctk.CTkEntry(scrollable_frame)
             websites_entry.insert(0, websites)
             websites_entry.grid(column = 0, sticky="nsew")
-        
+            
         start = rule.get("start_time")
         stop = rule.get("stop_time")
 
@@ -691,13 +531,15 @@ def edit_rules_modal(self, rule, mac = None):
                         index = list(weekdays_dict.values()).index(day)
                         weekdays_listbox.activate(index)            
             weekdays_listbox.grid(sticky=tk.NSEW)
+            
 
         rule_number = rule["rule"]
         
-        edit_button = ctk.CTkButton(scrollable_frame, text="edit", command = lambda : edit_setting())
+        edit_button = ctk.CTkButton(scrollable_frame, text="edit", command = lambda : edit_rule(modal, self, name_entry, existing_setting, iddevice_setting, stop_entry, start_entry, 
+                 rule_name, rule_number, start, stop, days, weekdays_listbox, selected_days, ip_value, websites_entry))
         edit_button.grid(pady = 10)
 
-        delete_button = ctk.CTkButton(scrollable_frame, fg_color="transparent", hover_color="#F24A3B", text="delete", command = lambda : delete_setting())
+        delete_button = ctk.CTkButton(scrollable_frame, fg_color="transparent", hover_color="#F24A3B", text="delete", command = lambda : delete_rule(modal, self, rule_number, existing_setting))
         delete_button.grid(pady = 5)
 
         start_index = rule["name"].index('-') + 1
@@ -705,144 +547,14 @@ def edit_rules_modal(self, rule, mac = None):
         iddevice_setting = rule["name"][start_index:end_index]
         existing_setting = device_setting.query.filter_by(iddevice_setting = iddevice_setting).first()
 
-        def edit_setting():
-            # existing_setting = device_setting.query.filter_by(rule_number = rule_number).first()
-            # print("existing setting:", existing_setting)
-            # if existing_setting:
-            #     setting_value = existing_setting.setting_value
-            #     print(setting_value)
-            name = name_entry.get()
-            if existing_setting:
-                setting_value = existing_setting.setting_value
-                new_name = f"SafeNet-{iddevice_setting}@{name}"
-            new_stop = stop_entry.get()
-            new_start = start_entry.get()
-            try:               
-                with open('router_data.json') as data_file:
-                    router_data = json.load(data_file)
-                host = router_data['ip_address']
-                username = router_data['router_user']
-                password = router_data['router_password']
-                client = paramiko.SSHClient()
-                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                client.connect(hostname=host, username=username, password=password)
-                if rule_name != new_name:
-                    change_name = f"uci set firewall.@rule[{rule_number}].name='{new_name}'"
-                    execute_command(client, change_name)
-                    setting_value["rule name"] = new_name
-                    print(setting_value)
-                    existing_setting.setting_value = setting_value   
-                if start:
-                    if start != new_start:
-                        if len(new_start) != 8:
-                            messagebox.showerror("Error", "Please enter the correct time format hh:mm:ss")
-                            return
-                        else:
-                            change_start = f"uci set firewall.@rule[{rule_number}].start_time='{new_start}'"
-                            execute_command(client, change_start)
-                            existing_setting.start_time = new_start
-                elif new_start:
-                    if len(new_start) != 8:
-                        messagebox.showerror("Error", "Please enter the correct time format hh:mm:ss")
-                        return
-                    else:
-                        add_start = f"uci set firewall.@rule[{rule_number}].start_time='{new_start}'"
-                        execute_command(client, add_start)
-                        existing_setting.start_time = new_start
-                if stop:
-                    if stop != new_stop:
-                        if len(new_stop) != 8:
-                            messagebox.showerror("Error", "Please enter the correct time format hh:mm:ss")
-                            return
-                        else:
-                            change_stop = f"uci set firewall.@rule[{rule_number}].stop_time='{new_stop}'"
-                            execute_command(client, change_stop)
-                            existing_setting.end_time = new_stop
-                elif new_stop:
-                    if len(new_stop) != 8:
-                        messagebox.showerror("Error", "Please enter the correct time format hh:mm:ss")
-                        return
-                    else:
-                        add_stop = f"uci set firewall.@rule[{rule_number}].stop_time='{new_stop}'"
-                        execute_command(client, add_stop)
-                        existing_setting.end_time = new_stop  
-                if days:
-                    new_weekdays = weekdays_listbox.get()
-                    weekdays_str = " ".join(new_weekdays)
-                    if selected_days != new_weekdays:
-                        change_weekdays = f"uci set firewall.@rule[{rule_number}].weekdays='{weekdays_str}'"
-                        execute_command(client, change_weekdays)
-                        setting_value["affected days"] = weekdays_str
-                        print(setting_value)
-                        existing_setting.setting_value = setting_value
-                if ip_value:
-                    new_websites = websites_entry.get().strip().split(",")
-                    new_websites = [ip.strip() for ip in new_websites]
-                    ip_list = ip_value.split(" ")
-                    print(ip_list)
-                    addresses_list = []
-                    for website in new_websites:
-                        ip_command = f"nslookup {website} | awk '/^Address: / {{ print $2 }}'"
-                        ip_address = execute_command(client, ip_command)
-                        first_ip_address = ip_address.split('\n')[0].strip()
-                        addresses_list.append(first_ip_address)
-                        addresses = " ".join(addresses_list)
-                    if ip_list != addresses_list:
-                        change_websites = f"uci set firewall.@rule[{rule_number}].dest_ip='{addresses}'\n"
-                        execute_command(client, change_websites)
-                        setting_value["websites"] = addresses
-                        print(setting_value)
-                        existing_setting.setting_value = setting_value
-                    else:
-                        print("same websites as before")
-                final_command = """uci commit firewall
-                                   service firewall restart"""
-                execute_command(client, final_command)
-                client.close()
-                db.session.commit()
-                print("Changes committed to the database")
-                modal.destroy()
-                calling_class = self.__class__.__name__
-                if calling_class == "DeviceSettings":
-                    self.show_device_settings()
-                if calling_class == "GeneralRules":
-                   self.show_general_rules()
-            except FileNotFoundError:
-                print("The JSON file wasn't found")
 
-        def delete_setting():
-            try:               
-                with open('router_data.json') as data_file:
-                    router_data = json.load(data_file)
-                command = f"""uci delete firewall.@rule[{rule_number}]
-                            uci commit firewall
-                            service firewall restart"""
-                host = router_data['ip_address']
-                username = router_data['router_user']
-                password = router_data['router_password']
-                client = paramiko.SSHClient()
-                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                client.connect(hostname=host, username=username, password=password)
-                client.exec_command(command)
-                client.close()
-                if existing_setting:
-                    db.session.delete(existing_setting)
-                    db.session.commit()
-                modal.destroy()    
-                calling_class = self.__class__.__name__
-                if calling_class == "DeviceSettings":
-                    self.show_device_settings()
-                if calling_class == "GeneralRules":
-                   self.show_general_rules()
-            except FileNotFoundError:
-                print("The JSON file wasn't found")
 
 #---------------------------------------------------SETTINGS FRAME / CONTAINER --------------------------------------------------
 from functools import partial
-from db_creation import settings
+from database.db_creation import settings
 from tkinter import ttk
 from CTkListbox import CTkListbox
-from db_creation import device_setting
+from database.db_creation import device_setting
 from datetime import datetime
 class Settings(ctk.CTkFrame):
     def __init__(self, parent, container):
@@ -1118,7 +830,6 @@ class Settings(ctk.CTkFrame):
                             uci commit firewall
                             service firewall restart"""
                 execute_command(client, command)
-                # rule_number = get_rule_number(client, -1)
                 client.close()
             except FileNotFoundError:
                 print("The JSON file wasn't found")
@@ -1259,7 +970,6 @@ class Settings(ctk.CTkFrame):
                 firewall_command += "service firewall restart\n"
 
                 execute_command(client, firewall_command)
-                # rule_number = get_rule_number(client, -1)
                 client.close()
                 modal.destroy()
             except FileNotFoundError:
@@ -1420,8 +1130,6 @@ class Settings(ctk.CTkFrame):
                 firewall_command += "uci commit firewall\n"
                 firewall_command += "service firewall restart\n" 
                 execute_command(client, firewall_command)
-                # rule_number_websites = get_rule_number(client, -2)
-                # rule_number_block_access = get_rule_number(client, -1)
                 client.close()
                 modal.destroy()
             except FileNotFoundError:
@@ -1462,14 +1170,6 @@ class Settings(ctk.CTkFrame):
 def execute_command(client, command):
         stdin, stdout, stderr = client.exec_command(command)
         return stdout.read().decode()
-
-def get_rule_number(client, rule_position):
-    command = "uci show firewall | grep '=rule'"
-    rules_str = execute_command(client, command)
-    lines = rules_str.strip().split('\n')
-    rule_line = lines[rule_position]
-    rule_index = rule_line.split('[')[1].split(']')[0]
-    return rule_index
 
 class GeneralRules(ctk.CTkFrame):
     def __init__(self, parent, container):
