@@ -9,7 +9,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///C:/Users/balin/Desktop/SQLite
 app.config['SQLALCHEMY_TRACK_NOTIFICATIONS'] = 'False'
 db = SQLAlchemy(app)
 
-rigths = db.Table( 'rights',
+user_has_devices = db.Table( 'user_has_devices',
     db.Column('iduser', db.Integer, db.ForeignKey('user.iduser'), primary_key=True),
     db.Column('iddevice', db.Integer, db.ForeignKey('device.iddevice'), primary_key=True)
  )
@@ -21,7 +21,7 @@ class user(db.Model):
     username = db.Column(db.VARCHAR(45), nullable = False, unique = True)
     password = db.Column(db.VARCHAR(64), nullable = False)
     account_type = db.Column(db.Enum('admin', 'standard'))
-    devices = relationship('device', secondary = rigths, back_populates='users')
+    devices = relationship('device', secondary = user_has_devices, back_populates='users')
     device_settings = relationship('device_setting', back_populates = 'user_')
 
 
@@ -32,21 +32,9 @@ class device(db.Model):
     device_name = db.Column(db.VARCHAR(45))
     MAC_address = db.Column(db.VARCHAR(17), nullable = False, unique = True)
     device_type = db.Column(db.Enum('Router', 'Extender', 'Mobile', 'Laptop', 'Computer', 'TV', 'Other'), nullable = False)
-    users = relationship('user', secondary = rigths, back_populates='devices')
+    users = relationship('user', secondary = user_has_devices, back_populates='devices')
     device_settings = relationship('device_setting', back_populates = 'device_', cascade="all, delete-orphan")
-    outgoing_connections = db.relationship('connection', foreign_keys='connection.iddevice_source', back_populates='source_device')
-    incoming_connections = db.relationship('connection', foreign_keys='connection.iddevice_destination', back_populates='destination_device')
 
-class connection(db.Model):
-    __tablename__ = 'connection'
-
-    iddevice_source = db.Column(db.Integer, db.ForeignKey('device.iddevice'), primary_key = True)
-    iddevice_destination = db.Column(db.ForeignKey('device.iddevice'), primary_key = True)
-    connection_type = db.Column(db.Enum('LAN', 'WLAN'), nullable = False) #WAN nu e necesar
-    speed = db.Column(db.FLOAT)
-    bandwidth = db.Column(db.Enum('2.4GHz', '5GHz')) #banda de frecventa e mandatory doar daca e conexiune wireless
-    source_device = db.relationship('device', foreign_keys=[iddevice_source], back_populates='outgoing_connections')
-    destination_device = db.relationship('device', foreign_keys=[iddevice_destination], back_populates='incoming_connections')
 
 class device_setting(db.Model):
     __tablename__ = 'device_setting'
