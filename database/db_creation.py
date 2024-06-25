@@ -60,7 +60,15 @@ class settings(db.Model):
     description = db.Column(db.VARCHAR(100))
     device_settings = relationship('device_setting', back_populates= 'setting')
 
+class templates(db.Model):
+    __tablename__ = 'templates'
 
+    idtemplate = db.Column(db.Integer, primary_key = True, autoincrement = True)
+    setting_value = db.Column(db.JSON)
+    rule_name = db.Column(db.VARCHAR(50))
+    start_time = db.Column(db.VARCHAR(8))
+    end_time = db.Column(db.VARCHAR(8))
+    
 block_access = settings(setting_name = 'Manage Access to Wi-fi' , description ='Manage which devices can access the network via Wi-fi')
 time_restriction = settings(setting_name = 'Network Usage Scheduler' , description = 'Definition of specific time periods during which network access is permitted or restricted for a device.')
 
