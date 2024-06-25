@@ -25,7 +25,7 @@ class App(ctk.CTk):
         super().__init__()
 
         self.title("SafeGuardKids")
-        self.geometry("720x550")
+        self.geometry("750x550")
         self.resizable(True, True)
     
         ## Creating a container
@@ -45,8 +45,9 @@ class App(ctk.CTk):
         self.Settings = Settings
         self.GeneralRules = GeneralRules
         self.UsualRules = UsualRules
+        self.About = About
 
-        for F in {LoginPage, SignupPage, RouterDataPage, HomePage, ManagedDevices, Settings, DeviceSettings, GeneralRules, UsualRules}:
+        for F in {LoginPage, SignupPage, RouterDataPage, HomePage, ManagedDevices, Settings, DeviceSettings, GeneralRules, UsualRules, About}:
             frame = F(self, container)
             self.frames[F] = frame
             frame.grid(row=0, column=0, sticky = "nsew")    
@@ -267,7 +268,7 @@ class HomePage(ctk.CTkFrame):
 
         help_menu = Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Help", menu=help_menu)
-        help_menu.add_command(label="About")
+        help_menu.add_command(label="About", command=lambda: parent.show_frame(parent.About))
         help_menu.add_separator()
         help_menu.add_command(label="Exit", command=parent.quit) 
 
@@ -328,7 +329,7 @@ class ManagedDevices(ctk.CTkFrame):
         ## help menu
         help_menu = Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Help", menu=help_menu)
-        help_menu.add_command(label="About")
+        help_menu.add_command(label="About", command=lambda: parent.show_frame(parent.About))
         help_menu.add_separator()
         help_menu.add_command(label="Exit", command=parent.quit) 
 
@@ -425,7 +426,7 @@ class DeviceSettings(ctk.CTkFrame):
         ## help menu
         help_menu = Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Help", menu=help_menu)
-        help_menu.add_command(label="About")
+        help_menu.add_command(label="About", command=lambda: parent.show_frame(parent.About))
         help_menu.add_separator()
         help_menu.add_command(label="Exit", command=parent.quit) 
 
@@ -1160,7 +1161,7 @@ class Settings(ctk.CTkFrame):
   
         help_menu = Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Help", menu=help_menu)
-        help_menu.add_command(label="About")
+        help_menu.add_command(label="About", command=lambda: parent.show_frame(parent.About))
         help_menu.add_separator()
         help_menu.add_command(label="Exit", command=parent.quit)
 
@@ -1216,7 +1217,7 @@ class GeneralRules(ctk.CTkFrame):
 
         help_menu = Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Help", menu=help_menu)
-        help_menu.add_command(label="About")
+        help_menu.add_command(label="About", command=lambda: parent.show_frame(parent.About))
         help_menu.add_separator()
         help_menu.add_command(label="Exit", command=parent.quit)
 
@@ -1245,8 +1246,119 @@ class UsualRules(ctk.CTkFrame):
 
         help_menu = Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Help", menu=help_menu)
-        help_menu.add_command(label="About")
+        help_menu.add_command(label="About", command=lambda: parent.show_frame(parent.About))
         help_menu.add_separator()
+        help_menu.add_command(label="Exit", command=parent.quit)
+
+        return menubar
+
+#--------------------------------------------------- ABOUT FRAME / CONTAINER --------------------------------------------------   
+class About(ctk.CTkFrame):
+    
+    def __init__(self, parent, container):
+        super().__init__(container)
+        global scrollable_about
+        scrollable_about = ctk.CTkScrollableFrame(self)
+        scrollable_about.pack(fill='both', expand=True)
+        label = ctk.CTkLabel(scrollable_about, text="User guide")
+        label.grid(row = 0, column = 0, sticky = N, pady = 20, padx = 10, columnspan = 2)
+        guide_text= """
+                        Authentication
+
+                        Upon launching the application, the login page appears. If the user already has an account, 
+                        they can enter their username in the top field and their password in the bottom field. 
+                        After entering this information, they should press the "Login" button. If the entered data is incorrect, 
+                        an error window will appear to alert the user. If the user does not have an account, 
+                        they can press the "Sign up" button to be redirected to the account creation page. 
+                        Here, they are required to enter a username and password for the new account. 
+                        The username must be unique in the database, so if the chosen name is already in use, 
+                        an error window will appear. If the account is successfully created, a confirmation message will appear. 
+                        The user can then return to the login page by pressing the "Login" button to authenticate. 
+                        Once successfully authenticated, the application will proceed to the next page.
+
+                        Router Connection
+
+                        The next page is where the user enters the login credentials for the router they wish to manage, 
+                        as shown in figure ?. The user must enter the router's account details, namely the username and password. 
+                        Next, they press the "Connect" button to initiate the connection to the router. 
+                        If the connection fails due to incorrect account details or router unavailability, 
+                        the user will be notified through an error window. If the connection is successfully established, 
+                        the application will move to the main page.
+
+                        Device Management
+
+                        The page displaying devices connected to the router is considered the application's main page 
+                        because it is where interaction with network devices begins. This page displays information about 
+                        each connected device, such as MAC address, IP address, hostname, and client identifier. 
+                        To manage a device, the user must click the "Manage" button associated with it. A window will appear, 
+                        where preliminary settings such as changing the hostname for easier identification 
+                        (e.g., from "Ubuntu" to "Child PC 1") and specifying the type of device (computer, mobile, laptop, etc.) 
+                        must be configured. After making these settings, click the "Add" button to add the device under management. 
+                        The "Manage" button associated with that device will be replaced with a label indicating 
+                        "managed" to identify which devices among those connected are already managed. At the top of 
+                        the page is the application menu, divided into three sections: "Devices," "Settings," and "Help." The "Devices" 
+                        section allows the user to access the managed devices page through the "Managed Devices" button. 
+                        The "Settings" section offers three options: creating a new rule with the "New" button, viewing rules applied to 
+                        all devices with the "General Rules" button, and viewing existing rule templates with the "Usual Rules" 
+                        button. The "Help" section contains the "About" option, where the application guide is located, 
+                        and the option to exit the application with the "Exit" button. This menu is accessible from all pages with minor 
+                        modifications depending on the user's current page.
+
+                        If the user wants to view managed devices, they can click on the "Managed Devices" button. 
+                        This page displays all devices managed within the application. The user has the option to 
+                        edit a device by pressing the "Edit" button associated with it. In this case,
+                        the page will switch to the device settings page, where desired modifications can be made. 
+                        The user can edit the hostname or device type if entered incorrectly during device management. 
+                        To save the edits, click the "Done" button. Additionally, the user can completely delete 
+                        the device from management, for example, if it is no longer in use.
+
+                        On this page, active rules applied to that specific device can also be viewed, but only those 
+                        specific to it. Each active rule has an associated edit button. Clicking it triggers a window 
+                        where the rule can be edited or deleted. To add a new setting, go to the "Settings" menu and 
+                        click "New". The page will switch to the settings page, where available setting types and a brief 
+                        description of each are displayed. Each setting has a button that, when pressed, opens a window where 
+                        necessary data must be entered. For example, to add a setting for blocking internet access 
+                        except for specific websites ("Block all access except for some websites"), the following information is 
+                        required: rule name (a default name exists but can be edited), allowed websites (separated by commas, 
+                        e.g., "cv.upt.ro,upt.ro"), selection of a specific device if the setting applies only to that device 
+                        (if nothing is selected, the setting will apply to all devices connected to the router), start time for 
+                        applying the rule, and end time if applying the setting for a specific period. To set the rule, click the 
+                        "Submit" button. After this, the window will close, and another rule can be added if desired. 
+                        The added setting will appear under "Managed Devices" for the specific device for which the rule was created,
+                        or under "General Rules" if applied to all devices. The same process applies to other rules. 
+                        All fields contain information on how they should be completed or helpful information. After 
+                        filling out these fields, click "Submit" to apply the rule.
+
+                        To view existing rules on all devices attached to the network, go to the "Settings" menu and click 
+                        "General Rules". The page will switch to the general settings page, shown in figure x, where active 
+                        rules can be viewed. Each rule has an associated "Edit" button, which, when clicked, opens a window 
+                        where those rules can be edited or deleted.
+
+                        To view templates created based on applied rules, go to the "Settings" menu and click "Usual Rules". 
+                        The page will switch to the usual rules page, shown in figure x, where existing templates can be viewed. 
+                        Each template has an associated "Apply on Device" button, which, when clicked, opens a window where the 
+                        device on which the template is to be applied must be selected. After selecting the device, 
+                        click "Apply" to activate the setting.
+
+                    """
+        guide_label = ctk.CTkLabel(scrollable_about, text=guide_text, anchor="center", justify=LEFT)
+        guide_label.grid(sticky=NSEW)
+
+    def create_menubar(self, parent):
+        menubar = Menu(parent, bd=3, relief=RAISED)
+
+        devicemenu = Menu(menubar, tearoff=0, relief=RAISED)
+        menubar.add_cascade(label="Devices", menu=devicemenu)
+        devicemenu.add_command(label="Connected devices", command=lambda: parent.show_frame(parent.HomePage))
+        devicemenu.add_command(label="Managed devices", command=lambda: parent.show_frame(parent.ManagedDevices))
+
+        setttingsmenu = Menu(menubar, tearoff=0, relief=RAISED)
+        menubar.add_cascade(label="Settings", menu=setttingsmenu)
+        setttingsmenu.add_command(label="New", command=lambda: parent.show_frame(parent.Settings))
+        setttingsmenu.add_command(label="Usual rules", command=lambda: parent.show_frame(parent.GeneralRules)) 
+
+        help_menu = Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Help", menu=help_menu)
         help_menu.add_command(label="Exit", command=parent.quit)
 
         return menubar
