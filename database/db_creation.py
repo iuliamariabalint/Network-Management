@@ -43,11 +43,11 @@ class device_setting(db.Model):
     iduser = db.Column(db.ForeignKey('user.iduser'), nullable = False)
     iddevice = db.Column(db.ForeignKey('device.iddevice'))
     idsetting = db.Column(db.ForeignKey('settings.idsetting'), nullable = False)
-    setting_value = db.Column(db.JSON)
+    setting_value = db.Column(db.JSON, nullable = False)
     setting_time = db.Column(db.DateTime, nullable = False)
     start_time = db.Column(db.VARCHAR(8))
     end_time = db.Column(db.VARCHAR(8))
-    rule_name = db.Column(db.VARCHAR(50))
+    rule_name = db.Column(db.VARCHAR(50), nullable = False)
     setting = relationship('settings', back_populates = 'device_settings')
     user_ = relationship('user', back_populates = 'device_settings')
     device_ = relationship('device', back_populates = 'device_settings')
@@ -64,8 +64,8 @@ class templates(db.Model):
     __tablename__ = 'templates'
 
     idtemplate = db.Column(db.Integer, primary_key = True, autoincrement = True)
-    setting_value = db.Column(db.JSON)
-    rule_name = db.Column(db.VARCHAR(50))
+    setting_value = db.Column(db.JSON, nullable = False)
+    rule_name = db.Column(db.VARCHAR(50), nullable = False)
     start_time = db.Column(db.VARCHAR(8))
     end_time = db.Column(db.VARCHAR(8))
     
