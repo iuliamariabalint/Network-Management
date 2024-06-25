@@ -4,10 +4,9 @@ from tkinter import messagebox
 import customtkinter as ctk
 from flask import Flask
 from database.db_creation import db, user, settings
-import bcrypt
 import atexit, os
 from logic.authentication import login, signup
-from logic.router import save_router_data
+from logic.router import save_router_data, send_command
 from logic.devices import get_active_clients, add_device, delete_device, edit_device
 from logic.firewall import get_firewall_rules, edit_rule, delete_rule
 
@@ -25,11 +24,9 @@ class App(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-       ## Setting up Initial Things
-        self.title("net-management")
+        self.title("SafeGuardKids")
         self.geometry("720x550")
         self.resizable(True, True)
-        #self.iconphoto(False, tk.PhotoImage(file="assets/title_icon.png"))
     
         ## Creating a container
         container = ctk.CTkFrame(self)
@@ -47,9 +44,9 @@ class App(ctk.CTk):
         self.DeviceSettings = DeviceSettings
         self.Settings = Settings
         self.GeneralRules = GeneralRules
+        self.UsualRules = UsualRules
 
-        ## Defining Frames and Packing it
-        for F in {LoginPage, SignupPage, RouterDataPage, HomePage, ManagedDevices, Settings, DeviceSettings, GeneralRules}:
+        for F in {LoginPage, SignupPage, RouterDataPage, HomePage, ManagedDevices, Settings, DeviceSettings, GeneralRules, UsualRules}:
             frame = F(self, container)
             self.frames[F] = frame
             frame.grid(row=0, column=0, sticky = "nsew")    
@@ -61,10 +58,10 @@ class App(ctk.CTk):
         frame = self.frames[cont]
         menubar = frame.create_menubar(self)
         self.configure(menu=menubar)
-        frame.tkraise()                         ## This line will put the frame on front
+        frame.tkraise()                       
     
     def delete_json_file(self):
-        file_path = "router_data.json"  # Specify the path to your JSON file
+        file_path = "router_data.json"
         if os.path.exists(file_path):
             os.remove(file_path)
             print(f"The file '{file_path}' has been deleted.")
@@ -78,15 +75,19 @@ class LoginPage(ctk.CTkFrame):
         super().__init__(container)
 
         label = ctk.CTkLabel(self, text="Login Page")
-        label.pack(pady=0,padx=0)
+        label.pack(pady = 2, padx = 0)
+
         username_entry = ctk.CTkEntry(self, placeholder_text = "Username")
         username_entry.pack(pady = 12, padx = 10)
 
         password_entry = ctk.CTkEntry(self, placeholder_text = "Password", show = "*")
         password_entry.pack(pady = 12, padx = 10)
 
-        button = ctk.CTkButton(self, text = "Login", command = lambda: login(self, parent, username_entry, password_entry))
-        button.pack(pady = 12, padx = 10)
+        login_button = ctk.CTkButton(self, text = "Login", command = lambda: login(self, parent, username_entry, password_entry))
+        login_button.pack(pady = 12, padx = 10)
+
+        label = ctk.CTkLabel(self, text = "Create an account: ")
+        label.pack(pady = 2, padx = 10)
 
         signup_button = ctk.CTkButton(self, text = "Sign up", cursor = 'hand2', command = lambda: parent.show_frame(parent.SignupPage))
         signup_button.pack(pady = 1, padx = 10)
@@ -162,11 +163,12 @@ class RouterDataPage(ctk.CTkFrame):
 #---------------------------------------- HOME PAGE FRAME / CONTAINER ------------------------------------------------------------------------
 import paramiko
 from database.db_creation import device
+import tkinter.font as tkFont
 
 class HomePage(ctk.CTkFrame):
     def __init__(self, parent, container):
         super().__init__(container)
-
+        
         self.parent_window = parent
         self.show_active_clients()
         self.columnconfigure(0, weight=1)
@@ -176,6 +178,7 @@ class HomePage(ctk.CTkFrame):
 
     def show_active_clients(self):
         dhcp_leases = get_active_clients(self)
+        processed_macs = set()
         try:
             for i, dhcp_lease in enumerate(dhcp_leases):
                 mac_address = dhcp_lease["mac_address"]
@@ -183,24 +186,27 @@ class HomePage(ctk.CTkFrame):
                 hostname = dhcp_lease["hostname"]
                 client_id = dhcp_lease["client_id"]
 
-                client_info = f"MAC Address: {mac_address}\nIP Address: {ip_address}\nHostname: {hostname}\nClient ID: {client_id}"
-                label = ctk.CTkLabel(self, text=client_info)
+                try: 
+                    if mac_address in processed_macs: 
+                        continue
+                except:
+                    return None
+
+                processed_macs.add(mac_address)
+
+                client_info = (f"MAC Address:  {mac_address}\n"
+                               f"IP Address:       {ip_address}\n"
+                               f"Hostname:        {hostname}\n"
+                               f"Client ID:           {client_id}")
+                label = ctk.CTkLabel(self, text=client_info, justify=LEFT)
                 label.grid(row=i+1, column=0, sticky = E, pady=30, padx=10)
 
                 existing_device = device.query.filter_by(MAC_address = mac_address).first()
                 if existing_device:
-                    manage_label = ctk.CTkLabel(self, text = "managed", text_color = "#5AD194", width=140)
+                    manage_label = ctk.CTkLabel(self, text = "Managed", text_color = "#5AD194", width=140)
                     manage_label.grid(row=i+1, column=1, sticky=W, pady=45, padx=10)
                 else:
-                    button = ctk.CTkButton(self, text="manage", command = lambda info = dhcp_lease: self.settings_modal(info))
-                    button.grid(row=i+1, column=1, sticky = W, pady=45, padx=10)
-                label = ctk.CTkLabel(self, text=client_info)
-                label.grid(row=i+1, column=0, sticky = E, pady=30, padx=10)
-                if existing_device:
-                    manage_label = ctk.CTkLabel(self, text = "managed", text_color = "#5AD194", width=140)
-                    manage_label.grid(row=i+1, column=1, sticky=W, pady=45, padx=10)
-                else:
-                    button = ctk.CTkButton(self, text="manage", command = lambda info = dhcp_lease: self.settings_modal(info))
+                    button = ctk.CTkButton(self, text="Manage", command = lambda info = dhcp_lease: self.settings_modal(info))
                     button.grid(row=i+1, column=1, sticky = W, pady=45, padx=10)
         except:
             print("firt time running")
@@ -287,9 +293,11 @@ class ManagedDevices(ctk.CTkFrame):
 
         devices = db.session.query(device.device_name, device.MAC_address, device.device_type).all()
         for i, dev in enumerate(devices):
-            device_data = f"{dev.device_name}\nMAC address: {dev.MAC_address}\nDevice type: {dev.device_type}"
+            device_data = (f"{dev.device_name}\n"
+                           f"MAC address: {dev.MAC_address}\n"
+                           f"Device type:    {dev.device_type}")
 
-            label = ctk.CTkLabel(self, text=device_data)
+            label = ctk.CTkLabel(self, text=device_data, anchor=W, justify=LEFT)
             label.grid(row=i+1, column=0, sticky=E, pady=45, padx=10)
 
             edit_button = ctk.CTkButton(self, text="edit", command= lambda dev = dev : self.edit_device(dev))
@@ -385,7 +393,7 @@ class DeviceSettings(ctk.CTkFrame):
             rules_without_index = [ {k: v for k, v in attributes.items() if k != 'rule'} for attributes in active_rules]
             for i, rule in enumerate(rules_without_index):
                 rule_str = "\n".join([f"{key}: {value}" for key, value in rule.items()])
-                rule_label = ctk.CTkLabel(scrollable_frame, text=rule_str, width=350)
+                rule_label = ctk.CTkLabel(scrollable_frame, text=rule_str, width=300, anchor=W, justify=LEFT)
                 rule_label.grid(row=8+i, column=0, sticky = E, pady=15, padx=10)
             for i, rule in enumerate(active_rules):
                 button = ctk.CTkButton(scrollable_frame, text="edit rule", command = lambda rule = rule : edit_rules_modal(self, rule, mac_address))
@@ -576,7 +584,7 @@ class Settings(ctk.CTkFrame):
             description = f"{setting.description}"
             name = f"{setting.setting_name}"
             button_command = partial(self.open_modal, parent, setting.setting_name)
-            button = ctk.CTkButton(self, text = name, command = button_command)
+            button = ctk.CTkButton(self, text = name, command = button_command, width=250)
             button.grid(row=i+1, column=0, sticky = N, pady=15, padx=10)
             label = ctk.CTkLabel(self, text=description)
             label.grid(row=i+1, column=0, sticky=N, pady=45, padx=10)
@@ -816,10 +824,10 @@ class Settings(ctk.CTkFrame):
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                 client.connect(hostname=host, username=username, password=password)
                 id_devicesetting = self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start, stop)
-                rule_name = f"SafeNet-{id_devicesetting}@{name}"
+                rule_name = f"SafeGuardKids-{id_devicesetting}@{name}"
 
                 command = f"""uci add firewall rule
-                            uci set firewall.@rule[-1].name={rule_name}
+                            uci set firewall.@rule[-1].name='{rule_name}'
                             uci set firewall.@rule[-1].src={src}
                             uci set firewall.@rule[-1].src_mac={mac}
                             uci set firewall.@rule[-1].dest={dest}
@@ -829,7 +837,7 @@ class Settings(ctk.CTkFrame):
                             uci set firewall.@rule[-1].target={target}
                             uci commit firewall
                             service firewall restart"""
-                execute_command(client, command)
+                send_command(client, command)
                 client.close()
             except FileNotFoundError:
                 print("The JSON file wasn't found")
@@ -947,11 +955,11 @@ class Settings(ctk.CTkFrame):
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                 client.connect(hostname=host, username=username, password=password)
                 id_devicesetting = self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value, setting_time, start, stop)
-                rule_name = f"SafeNet-{id_devicesetting}@{name}"
+                rule_name = f"SafeGuardKids-{id_devicesetting}@{name}"
                 addresses_list = []
                 for website in websites:
                     ip_command = f"nslookup {website} | awk '/^Address: / {{ print $2 }}'"
-                    ip_address = execute_command(client, ip_command)
+                    ip_address = send_command(client, ip_command)
                     first_ip_address = ip_address.split('\n')[0].strip()
                     addresses_list.append(first_ip_address)
                     addresses = " ".join(addresses_list)
@@ -969,7 +977,7 @@ class Settings(ctk.CTkFrame):
                 firewall_command += "uci commit firewall\n"
                 firewall_command += "service firewall restart\n"
 
-                execute_command(client, firewall_command)
+                send_command(client, firewall_command)
                 client.close()
                 modal.destroy()
             except FileNotFoundError:
@@ -1078,15 +1086,6 @@ class Settings(ctk.CTkFrame):
             if selected_mac:
                 affected_device = db.session.query(device).filter(device.MAC_address == selected_mac).first()
                 id_affected_device = affected_device.iddevice
-
-            # existing_setting1 = device.query.filter_by(MAC_address =id_devicesetting1).first()
-            # existing_setting2 = device.query.filter_by(MAC_address =id_devicesetting2).first()
-            # if existing_setting1:
-            #     existing_setting1.rule_name = rule_name_websites
-            #     db.session.commit()
-            # elif existing_setting2:
-            #     existing_setting2.rule_name = rule_name_websites
-            #     db.session.commit()
             try:               
                 with open('router_data.json') as data_file:
                     router_data = json.load(data_file)
@@ -1099,12 +1098,12 @@ class Settings(ctk.CTkFrame):
                 client.connect(hostname=host, username=username, password=password)
                 id_devicesetting1 = self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value_websites, setting_time, None, None)
                 id_devicesetting2 = self.save_devicesetting(id_connected_user, id_affected_device, id_selected_setting, setting_value_block, setting_time, start, stop)
-                rule_name_websites = f"SafeNet-{id_devicesetting1}@{name}"
-                rule_name_block = f"SafeNet-{id_devicesetting2}@Block all access"
+                rule_name_websites = f"SafeGuardKids-{id_devicesetting1}@{name}"
+                rule_name_block = f"SafeGuardKids-{id_devicesetting2}@Block all access"
                 addresses_list = []
                 for website in websites:
                     ip_command = f"nslookup {website} | awk '/^Address: / {{ print $2 }}'"
-                    ip_address = execute_command(client, ip_command)
+                    ip_address = send_command(client, ip_command)
                     first_ip_address = ip_address.split('\n')[0].strip()
                     addresses_list.append(first_ip_address)
                     addresses = " ".join(addresses_list)
@@ -1129,7 +1128,7 @@ class Settings(ctk.CTkFrame):
                 firewall_command += "uci set firewall.@rule[-1].target='REJECT'\n"
                 firewall_command += "uci commit firewall\n"
                 firewall_command += "service firewall restart\n" 
-                execute_command(client, firewall_command)
+                send_command(client, firewall_command)
                 client.close()
                 modal.destroy()
             except FileNotFoundError:
@@ -1167,10 +1166,7 @@ class Settings(ctk.CTkFrame):
 
         return menubar
     
-def execute_command(client, command):
-        stdin, stdout, stderr = client.exec_command(command)
-        return stdout.read().decode()
-
+#---------------------------------------------------GENERAL RULES FRAME / CONTAINER --------------------------------------------------
 class GeneralRules(ctk.CTkFrame):
     def __init__(self, parent, container):
         super().__init__(container)
@@ -1190,11 +1186,12 @@ class GeneralRules(ctk.CTkFrame):
         label = ctk.CTkLabel(scrollable_general_rules, text="Rules Applied to All Connected Devices")
         label.grid(row = 0, column = 0, sticky = N, pady = 20, padx = 10, columnspan = 2)
         general_rules = get_firewall_rules()
+        print("general rules", general_rules)
         try:
             rules_without_index = [ {k: v for k, v in attributes.items() if (k != 'rule')} for attributes in general_rules]
             for i, rule in enumerate(rules_without_index): 
                 rule_str = "\n".join([f"{key}: {value}" for key, value in rule.items()])
-                rule_label = ctk.CTkLabel(scrollable_general_rules, text=rule_str, width=350)
+                rule_label = ctk.CTkLabel(scrollable_general_rules, text=rule_str, width=300, anchor=W, justify=LEFT)
                 rule_label.grid(row=1+i, column=0, sticky = "E", pady=15, padx=10)
             for i, rule in enumerate(general_rules):
                 button = ctk.CTkButton(scrollable_general_rules, text="edit rule", command = lambda rule = rule : edit_rules_modal(self, rule))
@@ -1203,6 +1200,35 @@ class GeneralRules(ctk.CTkFrame):
             print("first time loading")
         self.after(7000, self.show_general_rules)
         
+
+    def create_menubar(self, parent):
+        menubar = Menu(parent, bd=3, relief=RAISED)
+
+        devicemenu = Menu(menubar, tearoff=0, relief=RAISED)
+        menubar.add_cascade(label="Devices", menu=devicemenu)
+        devicemenu.add_command(label="Connected devices", command=lambda: parent.show_frame(parent.HomePage))
+        devicemenu.add_command(label="Managed devices", command=lambda: parent.show_frame(parent.ManagedDevices))
+
+        setttingsmenu = Menu(menubar, tearoff=0, relief=RAISED)
+        menubar.add_cascade(label="Settings", menu=setttingsmenu)
+        setttingsmenu.add_command(label="New", command=lambda: parent.show_frame(parent.Settings))
+        setttingsmenu.add_command(label="Usual rules", command=lambda: parent.show_frame(parent.GeneralRules)) 
+
+        help_menu = Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Help", menu=help_menu)
+        help_menu.add_command(label="About")
+        help_menu.add_separator()
+        help_menu.add_command(label="Exit", command=parent.quit)
+
+        return menubar
+    
+#---------------------------------------------------USUAL RULES FRAME / CONTAINER --------------------------------------------------   
+class UsualRules(ctk.CTkFrame):
+
+    def __init__(self, parent, container):
+        super().__init__(container)
+        label = ctk.CTkLabel(self, text="Saved Templates")
+        label.grid(row = 0, column = 0, sticky = N, pady = 20, padx = 10, columnspan = 2)
 
     def create_menubar(self, parent):
         menubar = Menu(parent, bd=3, relief=RAISED)
