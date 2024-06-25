@@ -71,26 +71,26 @@ class App(ctk.CTk):
         
 class LoginPage(ctk.CTkFrame):
     def __init__(self, parent, container):
-    
+        
         super().__init__(container)
 
         label = ctk.CTkLabel(self, text="Login Page")
-        label.pack(pady = 2, padx = 0)
+        label.pack(pady=20)
 
-        username_entry = ctk.CTkEntry(self, placeholder_text = "Username")
-        username_entry.pack(pady = 12, padx = 10)
+        username_entry = ctk.CTkEntry(self, placeholder_text="Username")
+        username_entry.pack(pady=5)
 
-        password_entry = ctk.CTkEntry(self, placeholder_text = "Password", show = "*")
-        password_entry.pack(pady = 12, padx = 10)
+        password_entry = ctk.CTkEntry(self, placeholder_text="Password", show="*")
+        password_entry.pack(pady=12)
 
-        login_button = ctk.CTkButton(self, text = "Login", command = lambda: login(self, parent, username_entry, password_entry))
-        login_button.pack(pady = 12, padx = 10)
+        login_button = ctk.CTkButton(self, text="Login", command=lambda: login(self, parent, username_entry, password_entry))
+        login_button.pack(pady=12)
 
-        label = ctk.CTkLabel(self, text = "Create an account: ")
-        label.pack(pady = 2, padx = 10)
+        create_account_label = ctk.CTkLabel(self, text="Create an account:")
+        create_account_label.pack(pady=8)
 
-        signup_button = ctk.CTkButton(self, text = "Sign up", cursor = 'hand2', command = lambda: parent.show_frame(parent.SignupPage))
-        signup_button.pack(pady = 1, padx = 10)
+        signup_button = ctk.CTkButton(self, text="Sign up", cursor='hand2', command=lambda: parent.show_frame(parent.SignupPage))
+        signup_button.pack(pady=1)
 
         
     def get_iduser(self, username):
@@ -109,10 +109,10 @@ class SignupPage(ctk.CTkFrame):
         super().__init__(container)
 
         label = ctk.CTkLabel(self, text="Signup Page")
-        label.pack(pady=0,padx=0)
+        label.pack(pady=20, padx=0)
 
         username_entry = ctk.CTkEntry(self, placeholder_text = "Username")
-        username_entry.pack(pady = 12, padx = 10)
+        username_entry.pack(pady = 5, padx = 10)
 
         password_entry = ctk.CTkEntry(self, placeholder_text = "Password", show="*")
         password_entry.pack(pady = 12, padx = 10)
@@ -145,10 +145,10 @@ class RouterDataPage(ctk.CTkFrame):
         super().__init__(container)
 
         info = ctk.CTkLabel(self, text = "Please enter the router data")
-        info.pack(pady = 12, padx = 10)
+        info.pack(pady = 20, padx = 10)
 
         user_entry = ctk.CTkEntry(self, placeholder_text = "Router admin")
-        user_entry.pack(pady = 12, padx = 10)
+        user_entry.pack(pady = 5, padx = 10)
 
         password_entry = ctk.CTkEntry(self, placeholder_text = "Router password", show="*")
         password_entry.pack(pady = 12, padx = 10)
