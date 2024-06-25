@@ -47,7 +47,7 @@ class device_setting(db.Model):
     setting_time = db.Column(db.DateTime, nullable = False)
     start_time = db.Column(db.VARCHAR(8))
     end_time = db.Column(db.VARCHAR(8))
-    rule_name = db.Column(db.VARCHAR(50), nullable = False)
+    rule_name = db.Column(db.VARCHAR(50))
     setting = relationship('settings', back_populates = 'device_settings')
     user_ = relationship('user', back_populates = 'device_settings')
     device_ = relationship('device', back_populates = 'device_settings')
