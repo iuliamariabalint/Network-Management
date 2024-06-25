@@ -3,8 +3,6 @@ import paramiko
 from tkinter import messagebox
 
 def save_router_data(parent, user_entry, password_entry):
-        # Hash the password
-        #hashed_password = hash_password(password_entry.get())
             global credentials_saved
             user = user_entry
             password = password_entry
